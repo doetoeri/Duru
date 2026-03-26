@@ -1,0 +1,600 @@
+import React, { useState, useEffect } from 'react';
+import { initializeApp } from 'firebase/app';
+import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from 'firebase/auth';
+import { 
+  getFirestore, collection, onSnapshot, doc, 
+  setDoc, addDoc, deleteDoc, getDoc 
+} from 'firebase/firestore';
+
+// ==========================================
+// 1. Firebase 및 기본 설정
+// ==========================================
+let firebaseConfig = {};
+try {
+  if (typeof __firebase_config !== 'undefined') {
+    firebaseConfig = typeof __firebase_config === 'string' ? JSON.parse(__firebase_config) : __firebase_config;
+  }
+} catch (e) { console.error("Firebase Config Error"); }
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+const appId = typeof __app_id !== 'undefined' ? __app_id : 'gochon-1-8-premium-v6';
+
+const ATPT_CODE = "J10"; // 경기도교육청
+const SCHUL_CODE = "7531127"; // 고촌고등학교
+
+// --- 라이브러리 충돌 방지용 자체 SVG 아이콘 ---
+const Icons = {
+  Home: () => <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>,
+  Time: () => <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
+  Meal: () => <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" /></svg>,
+  Plan: () => <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" /></svg>,
+  Class: () => <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 002-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>,
+  Lock: () => <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>,
+  Plus: () => <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>,
+  Check: () => <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>,
+  X: () => <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" /></svg>,
+  Edit: () => <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
+};
+
+// ==========================================
+// 메인 애플리케이션
+// ==========================================
+export default function App() {
+  const [firebaseUser, setFirebaseUser] = useState(null);
+  const [isLogged, setIsLogged] = useState(false);
+  const [currentUser, setCurrentUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState('home');
+
+  // 모달 상태 (팝업 대체)
+  const [modal, setModal] = useState({ open: false, type: '', payload: {} });
+
+  // 실시간 동기화 데이터
+  const [data, setData] = useState({
+    announcements: [], schedules: [], materials: [], 
+    cleaning: {}, memos: {}, planner: [],
+    overrides: { meals: {}, time: {} }
+  });
+  const [apiData, setApiData] = useState({ timetable: {}, meals: {} });
+
+  // 날짜 계산 함수
+  const getDates = () => {
+    const td = new Date(); const tm = new Date(td); tm.setDate(td.getDate() + 1);
+    return {
+      tdStr: td.toISOString().split('T')[0],
+      tmStr: tm.toISOString().split('T')[0],
+      tdNeis: td.toISOString().split('T')[0].replace(/-/g, ''),
+      tmNeis: tm.toISOString().split('T')[0].replace(/-/g, ''),
+      dayIdx: td.getDay()
+    };
+  };
+  const dates = getDates();
+
+  // --- 1. 인증 로직 ---
+  useEffect(() => {
+    const initAuth = async () => {
+      try {
+        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) await signInWithCustomToken(auth, __initial_auth_token);
+        else await signInAnonymously(auth);
+      } catch (err) {}
+    };
+    initAuth();
+    const unsub = onAuthStateChanged(auth, (u) => { setFirebaseUser(u); setLoading(false); });
+    return () => unsub();
+  }, []);
+
+  // --- 2. Firestore 구독 ---
+  useEffect(() => {
+    if (!firebaseUser || !isLogged) return;
+    const base = (col) => collection(db, 'artifacts', appId, 'public', 'data', col);
+
+    const unsubList = [
+      onSnapshot(base('announcements'), s => setData(p => ({...p, announcements: s.docs.map(d=>({id:d.id, ...d.data()})).sort((a,b)=>b.at-a.at)}))),
+      onSnapshot(base('schedules'), s => setData(p => ({...p, schedules: s.docs.map(d=>({id:d.id, ...d.data()})).sort((a,b)=>new Date(a.date)-new Date(b.date))}))),
+      onSnapshot(base('materials'), s => setData(p => ({...p, materials: s.docs.map(d=>({id:d.id, ...d.data()})).sort((a,b)=>b.at-a.at)}))),
+      onSnapshot(base('cleaning'), s => { const obj={}; s.docs.forEach(d=>obj[d.id]=d.data().names); setData(p=>({...p, cleaning: obj})); }),
+      onSnapshot(base('memos'), s => { const obj={}; s.docs.forEach(d=>obj[d.id]=d.data().content); setData(p=>({...p, memos: obj})); }),
+      onSnapshot(base('override_meals'), s => { const obj={}; s.docs.forEach(d=>obj[d.id]=d.data()); setData(p=>({...p, overrides: {...p.overrides, meals: obj}})); }),
+      onSnapshot(base('override_time'), s => { const obj={}; s.docs.forEach(d=>obj[d.id]=d.data().periods); setData(p=>({...p, overrides: {...p.overrides, time: obj}})); }),
+      onSnapshot(collection(db, 'artifacts', appId, 'users', currentUser.id, 'planner'), s => {
+        setData(p => ({...p, planner: s.docs.map(d => ({id:d.id, ...d.data()})).sort((a,b)=>b.at-a.at) }));
+      })
+    ];
+    return () => unsubList.forEach(unsub => unsub());
+  }, [firebaseUser, isLogged, currentUser]);
+
+  // --- 3. NEIS API (방어적 로딩) ---
+  useEffect(() => {
+    const fetchNEIS = async () => {
+      try {
+        const [tRes, mRes] = await Promise.all([
+          fetch(`https://open.neis.go.kr/hub/hisTimetable?Type=json&ATPT_OFCDC_SC_CODE=${ATPT_CODE}&SD_SCHUL_CODE=${SCHUL_CODE}&GRADE=1&CLASS_NM=8&ALL_TI_YMD=${dates.tdNeis}`),
+          fetch(`https://open.neis.go.kr/hub/mealServiceDietInfo?Type=json&ATPT_OFCDC_SC_CODE=${ATPT_CODE}&SD_SCHUL_CODE=${SCHUL_CODE}&MLSV_FROM_YMD=${dates.tdNeis}&MLSV_TO_YMD=${dates.tmNeis}`)
+        ]);
+        const tData = await tRes.json();
+        const mData = await mRes.json();
+        
+        setApiData({
+          timetable: { [dates.tdStr]: tData.hisTimetable ? tData.hisTimetable[1].row.sort((a,b)=>a.PERIO-b.PERIO) : [] },
+          meals: {
+            [dates.tdStr]: mData.mealServiceDietInfo ? mData.mealServiceDietInfo[1].row.find(r => r.MLSV_YMD === dates.tdNeis) : null,
+            [dates.tmStr]: mData.mealServiceDietInfo ? mData.mealServiceDietInfo[1].row.find(r => r.MLSV_YMD === dates.tmNeis) : null
+          }
+        });
+      } catch (e) { console.error("API 연동 실패"); }
+    };
+    fetchNEIS();
+  }, [dates.tdNeis, dates.tmNeis, dates.tdStr, dates.tmStr]);
+
+  // --- 모달 서브밋 ---
+  const handleModalSubmit = async (values) => {
+    const { type, payload } = modal;
+    const base = (col) => collection(db, 'artifacts', appId, 'public', 'data', col);
+    
+    try {
+      if (type === 'NOTICE') await addDoc(base('announcements'), { title: values.title, content: values.content, at: Date.now() });
+      if (type === 'CLEAN') await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'cleaning', String(values.day)), { names: values.names });
+      if (type === 'MEMO') {
+        const ref = doc(db, 'artifacts', appId, 'public', 'data', 'memos', payload.id);
+        if (values.content) await setDoc(ref, { content: values.content, at: Date.now() }); else await deleteDoc(ref);
+      }
+      if (type === 'PLAN_ADD') await addDoc(collection(db, 'artifacts', appId, 'users', currentUser.id, 'planner'), { text: values.text, done: false, date: payload.date, at: Date.now() });
+      if (type === 'EDIT_MEAL') {
+        const ref = doc(db, 'artifacts', appId, 'public', 'data', 'override_meals', payload.date);
+        if (values.menu) await setDoc(ref, { DDISH_NM: values.menu, CAL_INFO: values.cal || '' }); else await deleteDoc(ref);
+      }
+      if (type === 'EDIT_TIME') {
+        const ref = doc(db, 'artifacts', appId, 'public', 'data', 'override_time', payload.date);
+        if (values.periods) await setDoc(ref, { periods: values.periods.split(',').map(s=>s.trim()) }); else await deleteDoc(ref);
+      }
+      if (type === 'EDIT_WEEK_TIME') {
+        for (let i = 1; i <= 5; i++) {
+          const ref = doc(db, 'artifacts', appId, 'public', 'data', 'override_time', 'day_' + i);
+          if (values['day' + i]) await setDoc(ref, { periods: values['day' + i].split(',').map(s=>s.trim()) });
+          else await deleteDoc(ref);
+        }
+      }
+      if (type === 'SCHED') await addDoc(base('schedules'), { title: values.title, date: values.date, at: Date.now() });
+      if (type === 'FILE') await addDoc(base('materials'), { title: values.title, subject: values.subject, link: values.link, at: Date.now() });
+    } catch (e) { alert('저장 중 오류가 발생했습니다.'); }
+    
+    setModal({ open: false, type: '', payload: {} });
+  };
+
+  // --- 화면 렌더링 ---
+  if (loading) return <LoadingScreen />;
+  if (!isLogged) return <LoginScreen db={db} appId={appId} onLogin={(u) => { setCurrentUser(u); setIsLogged(true); }} />;
+
+  return (
+    <div className="min-h-screen bg-[#FDF7FF] text-[#1D1B20] font-sans pb-28 relative overflow-x-hidden">
+      {/* 쫀득한 애니메이션을 위한 전역 CSS */}
+      <style dangerouslySetInnerHTML={{__html: `
+        @keyframes spring-up {
+          0% { opacity: 0; transform: translateY(30px) scale(0.95); }
+          50% { opacity: 1; transform: translateY(-5px) scale(1.02); }
+          100% { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        .animate-spring { animation: spring-up 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
+        .btn-spring { transition: transform 0.15s cubic-bezier(0.175, 0.885, 0.32, 1.275), background-color 0.2s; }
+        .btn-spring:active { transform: scale(0.9); }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+      `}} />
+
+      <CustomModal isOpen={modal.open} type={modal.type} payload={modal.payload} onClose={() => setModal({open:false})} onSubmit={handleModalSubmit} />
+      
+      {/* 헤더 */}
+      <header className="sticky top-0 z-40 bg-[#FDF7FF]/80 backdrop-blur-xl border-b border-[#E7E0EC]/50 px-6 h-16 flex items-center justify-between">
+        <div><h1 className="text-2xl font-black text-[#1D1B20] tracking-tighter">고촌고 1-8 <span className="text-[#6750A4]">✦</span></h1></div>
+        <div className="flex items-center gap-3">
+          <div className="text-right">
+            <p className="text-xs font-black">{currentUser.id}</p>
+            <p className="text-[9px] text-[#6750A4] font-black uppercase tracking-widest">{currentUser.isAdmin ? 'Admin' : 'Student'}</p>
+          </div>
+          <button onClick={() => setIsLogged(false)} className="btn-spring bg-[#F3EDF7] p-2.5 rounded-full text-[#6750A4]"><Icons.Lock /></button>
+        </div>
+      </header>
+
+      {/* 메인 뷰 */}
+      <main className="max-w-xl mx-auto p-4">
+        {activeTab === 'home' && <HomeTab data={data} apiData={apiData} isAdmin={currentUser.isAdmin} dates={dates} openModal={(t,p)=>setModal({open:true,type:t,payload:p})} db={db} appId={appId} />}
+        {activeTab === 'time' && <TimeTab data={data} apiData={apiData} isAdmin={currentUser.isAdmin} dates={dates} openModal={(t,p)=>setModal({open:true,type:t,payload:p})} />}
+        {activeTab === 'meal' && <MealTab data={data} apiData={apiData} isAdmin={currentUser.isAdmin} dates={dates} openModal={(t,p)=>setModal({open:true,type:t,payload:p})} />}
+        {activeTab === 'plan' && <PlannerTab planner={data.planner} dates={dates} openModal={(t,p)=>setModal({open:true,type:t,payload:p})} db={db} appId={appId} uid={currentUser.id} />}
+        {activeTab === 'class' && <ClassTab data={data} isAdmin={currentUser.isAdmin} openModal={(t,p)=>setModal({open:true,type:t,payload:p})} db={db} appId={appId} />}
+      </main>
+
+      {/* 네비게이션 */}
+      <nav className="fixed bottom-0 left-0 right-0 bg-[#FDF7FF]/90 backdrop-blur-xl h-20 flex justify-around items-center px-2 shadow-[0_-10px_30px_rgba(103,80,164,0.05)] z-40">
+        <NavBtn id="home" active={activeTab} set={setActiveTab} icon={Icons.Home} label="홈" />
+        <NavBtn id="time" active={activeTab} set={setActiveTab} icon={Icons.Time} label="시간표" />
+        <NavBtn id="meal" active={activeTab} set={setActiveTab} icon={Icons.Meal} label="급식" />
+        <NavBtn id="plan" active={activeTab} set={setActiveTab} icon={Icons.Plan} label="플래너" />
+        <NavBtn id="class" active={activeTab} set={setActiveTab} icon={Icons.Class} label="학급" />
+      </nav>
+    </div>
+  );
+}
+
+// ==========================================
+// 컴포넌트: 로딩 & 로그인
+// ==========================================
+function LoadingScreen() {
+  return (
+    <div className="h-screen flex flex-col items-center justify-center bg-[#FDF7FF]">
+      <div className="w-12 h-12 border-4 border-[#EADDFF] border-t-[#6750A4] rounded-full animate-spin mb-4" />
+      <p className="text-[#6750A4] font-black tracking-widest text-sm">LOADING PREMIUM</p>
+    </div>
+  );
+}
+
+function LoginScreen({ db, appId, onLogin }) {
+  const [sid, setSid] = useState(''); const [pw, setPw] = useState('');
+  const [error, setError] = useState(''); const [needsReg, setNeedsReg] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault(); setError('');
+    const idNum = parseInt(sid);
+    if (!sid || idNum < 10800 || idNum > 10834) return setError("학번은 10800 ~ 10834 사이입니다.");
+    if (!pw) return setError("비밀번호를 입력하세요.");
+
+    setLoading(true);
+    try {
+      const snap = await getDoc(doc(db, 'artifacts', appId, 'public', 'data', 'profiles', sid));
+      if (snap.exists()) {
+        if (snap.data().pw === pw) onLogin({ id: sid, isAdmin: sid === '10800' });
+        else setError("비밀번호가 틀렸습니다.");
+      } else setNeedsReg(true);
+    } catch (e) { setError("서버 오류가 발생했습니다."); }
+    setLoading(false);
+  };
+
+  const handleRegister = async () => {
+    setLoading(true);
+    await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'profiles', sid), { pw, sid, isAdmin: sid === '10800', at: Date.now() });
+    onLogin({ id: sid, isAdmin: sid === '10800' });
+  };
+
+  return (
+    <div className="h-screen flex items-center justify-center bg-[#FDF7FF] p-6">
+      <div className="w-full max-w-sm bg-white rounded-[40px] p-8 shadow-[0_20px_40px_rgba(103,80,164,0.1)] border border-[#EADDFF]/50 animate-spring">
+        <div className="text-center mb-8">
+          <div className="w-20 h-20 bg-[#EADDFF] rounded-[24px] flex items-center justify-center mx-auto mb-5 text-[#381E72] shadow-inner"><Icons.Lock /></div>
+          <h2 className="text-3xl font-black text-[#1D1B20] tracking-tighter">1-8 Portal</h2>
+          <p className="text-xs text-[#6750A4] font-bold mt-2">학번과 비밀번호를 입력하세요</p>
+        </div>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <input type="number" placeholder="학번 (10800~10834)" value={sid} onChange={e=>{setSid(e.target.value); setNeedsReg(false);}} className="w-full bg-[#F3EDF7] p-5 rounded-[24px] outline-none focus:bg-[#EADDFF]/30 transition-colors font-black text-lg text-center" />
+          <input type="password" placeholder="비밀번호" value={pw} onChange={e=>{setPw(e.target.value); setNeedsReg(false);}} className="w-full bg-[#F3EDF7] p-5 rounded-[24px] outline-none focus:bg-[#EADDFF]/30 transition-colors font-black text-lg text-center" />
+          {error && <p className="text-red-500 text-xs font-bold text-center bg-red-50 py-3 rounded-xl animate-spring">{error}</p>}
+          {needsReg ? (
+            <div className="bg-[#EADDFF] p-5 rounded-[24px] text-center animate-spring">
+              <p className="text-sm font-black text-[#21005D] mb-4 leading-relaxed">등록되지 않은 학번입니다.<br/>이 비밀번호로 가입할까요?</p>
+              <div className="flex gap-2">
+                <button type="button" onClick={()=>setNeedsReg(false)} className="btn-spring flex-1 py-4 bg-white text-[#6750A4] rounded-[16px] font-black shadow-sm">취소</button>
+                <button type="button" onClick={handleRegister} className="btn-spring flex-1 py-4 bg-[#6750A4] text-white rounded-[16px] font-black shadow-sm">가입/접속</button>
+              </div>
+            </div>
+          ) : (
+            <button type="submit" className="btn-spring w-full bg-[#6750A4] text-white py-5 rounded-[24px] font-black text-lg shadow-[0_8px_16px_rgba(103,80,164,0.2)]">
+              {loading ? '로딩 중...' : '접속하기'}
+            </button>
+          )}
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// ==========================================
+// 컴포넌트: 커스텀 입력 모달 (경고창 완전 대체)
+// ==========================================
+function CustomModal({ isOpen, type, payload, onClose, onSubmit }) {
+  const [vals, setVals] = useState({});
+  useEffect(() => { if(isOpen) setVals(payload?.default || {}); }, [isOpen, payload]);
+  if (!isOpen) return null;
+
+  let title = "입력", inputs = [];
+  if (type === 'NOTICE') { title = "공지사항 추가"; inputs = [{k:'title', p:'제목'}, {k:'content', p:'내용 (엔터로 줄바꿈 가능)'}]; }
+  if (type === 'CLEAN') { title = "당번 지정"; inputs = [{k:'day', type:'number', p:'요일 (1:월~5:금)'}, {k:'names', p:'당번 이름들'}]; }
+  if (type === 'MEMO') { title = "시간표 메모"; inputs = [{k:'content', p:'준비물 등 (비우면 삭제)'}]; }
+  if (type === 'PLAN_ADD') { title = "플래너 추가"; inputs = [{k:'text', p:'할 일 내용'}]; }
+  if (type === 'EDIT_MEAL') { title = "급식 수동 입력(수정)"; inputs = [{k:'menu', p:'메뉴 (비우면 API 연동됨)'}, {k:'cal', p:'칼로리 (선택)'}]; }
+  if (type === 'EDIT_TIME') { title = "시간표 수동 입력(수정)"; inputs = [{k:'periods', p:'쉼표로 구분 (예: 국어,수학,영어)'}]; }
+  if (type === 'EDIT_WEEK_TIME') { title = "주간 시간표 일괄 설정"; inputs = [{k:'day1', p:'월요일 (쉼표 구분)'}, {k:'day2', p:'화요일'}, {k:'day3', p:'수요일'}, {k:'day4', p:'목요일'}, {k:'day5', p:'금요일'}]; }
+  if (type === 'SCHED') { title = "일정 추가"; inputs = [{k:'title', p:'일정명'}, {k:'date', type:'date', p:''}]; }
+  if (type === 'FILE') { title = "자료 공유"; inputs = [{k:'title', p:'자료명'}, {k:'subject', p:'과목'}, {k:'link', p:'공유 URL 링크'}]; }
+
+  const nonRequiredFields = ['content', 'cal', 'menu', 'periods', 'day1', 'day2', 'day3', 'day4', 'day5'];
+
+  return (
+    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-6 animate-spring">
+      <div className="bg-white w-full max-w-sm rounded-[40px] p-8 shadow-2xl border border-[#EADDFF]/50">
+        <h3 className="text-2xl font-black mb-6 text-[#1D1B20]">{title}</h3>
+        <form onSubmit={e => { e.preventDefault(); onSubmit(vals); }} className="space-y-4">
+          <div className="max-h-[50vh] overflow-y-auto space-y-4 pb-2 no-scrollbar">
+            {inputs.map(i => (
+              <input key={i.k} type={i.type||'text'} placeholder={i.p} required={!nonRequiredFields.includes(i.k)}
+                value={vals[i.k] || ''} onChange={e => setVals({...vals, [i.k]: e.target.value})}
+                className="w-full bg-[#F3EDF7] p-5 rounded-[20px] outline-none focus:ring-2 ring-[#6750A4] font-bold transition-all text-[#1D1B20]" />
+            ))}
+          </div>
+          <div className="flex gap-3 pt-4">
+            <button type="button" onClick={onClose} className="btn-spring flex-1 py-4 bg-[#F3EDF7] text-[#49454F] rounded-[20px] font-black">취소</button>
+            <button type="submit" className="btn-spring flex-1 py-4 bg-[#6750A4] text-white rounded-[20px] font-black shadow-lg">저장</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// --- 바텀 네비게이션 버튼 ---
+function NavBtn({ id, active, set, icon: Icon, label }) {
+  const isAct = active === id;
+  return (
+    <button onClick={() => set(id)} className="btn-spring flex flex-col items-center justify-center w-14 gap-1 relative group">
+      <div className={`p-2 px-5 rounded-full transition-colors duration-300 z-10 ${isAct ? 'bg-[#EADDFF] text-[#21005D]' : 'text-[#49454F] group-hover:bg-[#F3EDF7]'}`}>
+        <Icon />
+      </div>
+      <span className={`text-[10px] font-black z-10 ${isAct ? 'text-[#1D1B20]' : 'text-[#49454F]'}`}>{label}</span>
+    </button>
+  );
+}
+
+// ==========================================
+// 탭: 홈
+// ==========================================
+function HomeTab({ data, apiData, isAdmin, dates, openModal, db, appId }) {
+  const duty = (dates.dayIdx > 0 && dates.dayIdx < 6) ? (data.cleaning[dates.dayIdx] || '미지정') : '주말 휴식';
+  const nextEvt = data.schedules.filter(s => new Date(s.date) >= new Date(dates.tdStr))[0];
+  const meal = data.overrides.meals[dates.tdStr] || apiData.meals[dates.tdStr];
+
+  return (
+    <div className="space-y-6 animate-spring">
+      <section className="bg-[#EADDFF] p-6 rounded-[36px] shadow-sm relative overflow-hidden">
+        <div className="flex justify-between items-center mb-5">
+          <h2 className="font-black text-[#21005D] text-xl">📢 학급 공지</h2>
+          {isAdmin && <button onClick={() => openModal('NOTICE')} className="btn-spring w-10 h-10 bg-[#6750A4] text-white rounded-full flex items-center justify-center shadow-md"><Icons.Plus /></button>}
+        </div>
+        <div className="space-y-3">
+          {data.announcements.length > 0 ? data.announcements.slice(0,2).map(a => (
+            <div key={a.id} className="bg-white/70 backdrop-blur-md p-5 rounded-[24px] relative group border border-white transition-all">
+              <h3 className="font-black text-[15px] text-[#1D1B20]">{a.title}</h3>
+              <p className="text-sm text-[#49454F] mt-1 font-medium leading-relaxed">{a.content}</p>
+              {isAdmin && <button onClick={()=>deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'announcements', a.id))} className="btn-spring absolute top-3 right-3 text-[10px] text-red-500 font-black bg-white px-3 py-1.5 rounded-full shadow-sm">삭제</button>}
+            </div>
+          )) : <div className="bg-white/40 p-5 rounded-[24px] text-center text-sm font-bold text-[#6750A4] opacity-70">등록된 공지가 없습니다.</div>}
+        </div>
+      </section>
+
+      <div className="grid grid-cols-2 gap-4">
+        <div className="bg-white p-6 rounded-[32px] text-center shadow-sm border border-[#E7E0EC]">
+          <p className="text-xs font-black text-[#6750A4] mb-3">🧹 오늘 청소</p>
+          <div className="bg-[#F3EDF7] py-4 rounded-[20px] font-black text-[#21005D] text-lg">{duty}</div>
+          {isAdmin && <button onClick={() => openModal('CLEAN', {default:{day:dates.dayIdx}})} className="mt-3 text-[10px] bg-[#EADDFF] px-3 py-1.5 rounded-full text-[#6750A4] font-bold">편집</button>}
+        </div>
+        <div className="bg-white p-6 rounded-[32px] text-center shadow-sm border border-[#E7E0EC]">
+          <p className="text-xs font-black text-[#6750A4] mb-3">📅 다음 일정</p>
+          <div className="bg-[#F3EDF7] py-4 rounded-[20px] font-black text-[#21005D] text-lg truncate px-2">{nextEvt ? nextEvt.title : '없음'}</div>
+        </div>
+      </div>
+
+      <section className="bg-white p-6 rounded-[36px] shadow-sm border border-[#E7E0EC]">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="font-black text-[#1D1B20] text-lg">🍱 오늘의 급식</h3>
+          {isAdmin && <button onClick={()=>openModal('EDIT_MEAL', {date: dates.tdStr, default:{menu: meal?.DDISH_NM, cal: meal?.CAL_INFO}})} className="btn-spring text-[10px] bg-[#F3EDF7] text-[#6750A4] px-3 py-1.5 rounded-full font-black">수동 편집</button>}
+        </div>
+        <div className="text-base font-bold text-[#1D1B20] bg-[#FDF7FF] p-5 rounded-[24px] whitespace-pre-wrap leading-relaxed border border-[#EADDFF]/50">
+          {meal?.DDISH_NM ? (meal.DDISH_NM || '').replace(/<br\/>/gi, '\n') : <span className="opacity-40 block text-center">급식 정보가 없습니다.</span>}
+        </div>
+      </section>
+    </div>
+  );
+}
+
+// ==========================================
+// 탭: 플래너
+// ==========================================
+function PlannerTab({ planner, dates, openModal, db, appId, uid }) {
+  const [viewDate, setViewDate] = useState(dates.tdStr);
+  const tasks = planner.filter(p => p.date === viewDate);
+
+  const toggleTask = async (task) => { await setDoc(doc(db, 'artifacts', appId, 'users', uid, 'planner', task.id), { done: !task.done }, { merge: true }); };
+  const delTask = async (id) => { await deleteDoc(doc(db, 'artifacts', appId, 'users', uid, 'planner', id)); };
+
+  return (
+    <div className="space-y-6 animate-spring">
+      <div className="flex bg-white rounded-full p-1.5 shadow-sm border border-[#E7E0EC]">
+        <button onClick={()=>setViewDate(dates.tdStr)} className={`btn-spring flex-1 py-3 rounded-full text-sm font-black transition-colors ${viewDate===dates.tdStr ? 'bg-[#EADDFF] text-[#21005D]' : 'text-[#49454F]'}`}>오늘</button>
+        <button onClick={()=>setViewDate(dates.tmStr)} className={`btn-spring flex-1 py-3 rounded-full text-sm font-black transition-colors ${viewDate===dates.tmStr ? 'bg-[#EADDFF] text-[#21005D]' : 'text-[#49454F]'}`}>내일</button>
+      </div>
+
+      <div className="bg-[#F3EDF7] p-6 rounded-[40px] shadow-inner">
+        <div className="flex justify-between items-center mb-6">
+          <h2 className="text-2xl font-black text-[#21005D]">✅ 학습 플래너</h2>
+          <button onClick={()=>openModal('PLAN_ADD', {date: viewDate})} className="btn-spring w-12 h-12 bg-[#6750A4] text-white rounded-full flex items-center justify-center font-black shadow-lg"><Icons.Plus /></button>
+        </div>
+        <div className="space-y-3">
+          {tasks.length > 0 ? tasks.map(t => (
+            <div key={t.id} className="bg-white p-5 rounded-[24px] flex items-center justify-between group shadow-sm border border-transparent hover:border-[#EADDFF] transition-all animate-spring">
+              <button onClick={() => toggleTask(t)} className="flex items-center gap-4 flex-1 text-left">
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center border-2 transition-colors ${t.done ? 'bg-[#6750A4] border-[#6750A4] text-white' : 'border-[#CAC4D0] text-transparent'}`}>
+                  <Icons.Check />
+                </div>
+                <span className={`font-bold text-lg transition-all ${t.done ? 'line-through text-[#CAC4D0]' : 'text-[#1D1B20]'}`}>{t.text}</span>
+              </button>
+              <button onClick={() => delTask(t.id)} className="btn-spring text-red-500 opacity-0 group-hover:opacity-100 bg-red-50 p-2 rounded-full"><Icons.X /></button>
+            </div>
+          )) : (
+            <div className="text-center py-16 opacity-40 font-bold">
+              <div className="flex justify-center mb-4 opacity-50"><Icons.Plan /></div>
+              할 일을 추가하여 동기화하세요!
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ==========================================
+// 탭: 시간표
+// ==========================================
+function TimeTab({ data, apiData, isAdmin, dates, openModal }) {
+  const [view, setView] = useState('today');
+  const targetDateStr = view === 'today' ? dates.tdStr : dates.tmStr;
+  
+  let list = [];
+  const targetDayIdx = new Date(targetDateStr).getDay();
+  const dailyOverride = data.overrides.time[targetDateStr];
+  const weeklyOverride = data.overrides.time['day_' + targetDayIdx];
+  
+  let sourceLabel = 'NEIS 연동됨';
+  let isOverride = false;
+
+  if (dailyOverride) { 
+    list = dailyOverride.map((sub, i) => ({ PERIO: String(i+1), ITRT_CNTNT: sub })); 
+    sourceLabel = '일간 수동편집됨';
+    isOverride = true;
+  } else if (weeklyOverride && weeklyOverride.length > 0) {
+    list = weeklyOverride.map((sub, i) => ({ PERIO: String(i+1), ITRT_CNTNT: sub })); 
+    sourceLabel = '주간 일괄설정됨';
+    isOverride = true;
+  } else { 
+    list = apiData.timetable[targetDateStr] || []; 
+  }
+
+  const weekDefaults = {};
+  [1,2,3,4,5].forEach(i => {
+    if (data.overrides.time['day_'+i]) weekDefaults['day'+i] = data.overrides.time['day_'+i].join(', ');
+  });
+
+  return (
+    <div className="space-y-6 animate-spring">
+      <div className="flex bg-white rounded-full p-1.5 shadow-sm border border-[#E7E0EC]">
+        <button onClick={()=>setView('today')} className={`btn-spring flex-1 py-3 rounded-full text-sm font-black transition-colors ${view==='today' ? 'bg-[#EADDFF] text-[#21005D]' : 'text-[#49454F]'}`}>오늘</button>
+        <button onClick={()=>setView('tomorrow')} className={`btn-spring flex-1 py-3 rounded-full text-sm font-black transition-colors ${view==='tomorrow' ? 'bg-[#EADDFF] text-[#21005D]' : 'text-[#49454F]'}`}>내일</button>
+      </div>
+
+      <div className="flex items-center justify-between px-2">
+        <h2 className="text-3xl font-black text-[#1D1B20]">시간표</h2>
+        <div className="flex items-center gap-2">
+          <span className={`text-[10px] px-3 py-1.5 rounded-full font-black tracking-widest ${isOverride ? 'bg-[#F2B8B5] text-[#8C1D18]' : 'bg-[#EADDFF] text-[#21005D]'}`}>
+            {sourceLabel}
+          </span>
+        </div>
+      </div>
+
+      {isAdmin && (
+        <div className="flex justify-end px-2 -mt-3 gap-2">
+          <button onClick={()=>openModal('EDIT_WEEK_TIME', {default: weekDefaults})} className="btn-spring text-[11px] bg-[#EADDFF] text-[#21005D] px-4 py-2.5 rounded-[14px] font-black shadow-sm">주간 일괄 설정</button>
+          <button onClick={()=>openModal('EDIT_TIME', {date: targetDateStr, default:{periods: list.map(l=>l.ITRT_CNTNT).join(',')}})} className="btn-spring text-[11px] bg-[#F3EDF7] text-[#6750A4] px-4 py-2.5 rounded-[14px] font-black shadow-sm">{targetDateStr.slice(5)} 개별 수정</button>
+        </div>
+      )}
+
+      <div className="space-y-4">
+        {list.length > 0 ? list.map(t => (
+          <div key={t.PERIO} className="bg-white border border-[#E7E0EC] p-5 rounded-[32px] flex justify-between items-center shadow-sm">
+            <div className="flex items-center gap-6">
+              <span className="w-14 h-14 bg-[#6750A4] text-white rounded-[24px] flex items-center justify-center font-black text-2xl shadow-inner">{t.PERIO}</span>
+              <div>
+                <h4 className="font-black text-2xl text-[#1D1B20]">{t.ITRT_CNTNT}</h4>
+                {data.memos[`${targetDateStr}_${t.PERIO}`] && <p className="text-xs text-[#6750A4] font-black mt-2 bg-[#FDF7FF] px-3 py-1.5 rounded-xl inline-block border border-[#EADDFF]/50">💡 {data.memos[`${targetDateStr}_${t.PERIO}`]}</p>}
+              </div>
+            </div>
+            <button onClick={()=>openModal('MEMO', {id: `${targetDateStr}_${t.PERIO}`, default:{content: data.memos[`${targetDateStr}_${t.PERIO}`]}})} className="btn-spring p-4 bg-[#F3EDF7] rounded-full text-[#6750A4] hover:bg-[#EADDFF]"><Icons.Edit /></button>
+          </div>
+        )) : <div className="py-24 text-center opacity-30 font-black text-xl">오늘은 수업이 없습니다.</div>}
+      </div>
+    </div>
+  );
+}
+
+// ==========================================
+// 탭: 급식
+// ==========================================
+function MealTab({ data, apiData, isAdmin, dates, openModal }) {
+  const Card = ({ dateStr, title, isToday }) => {
+    const meal = data.overrides.meals[dateStr] || apiData.meals[dateStr];
+    return (
+      <div className={`p-8 rounded-[40px] shadow-sm relative ${isToday ? 'bg-[#D0BCFF] text-[#381E72]' : 'bg-[#F3EDF7] text-[#1D1B20]'}`}>
+        <div className="flex justify-between items-center mb-6">
+          <h2 className="text-3xl font-black">{title}</h2>
+          {isAdmin && <button onClick={()=>openModal('EDIT_MEAL', {date: dateStr, default:{menu: meal?.DDISH_NM, cal: meal?.CAL_INFO}})} className="btn-spring p-2 bg-black/10 rounded-full text-current"><Icons.Edit /></button>}
+        </div>
+        <div className="bg-white/90 backdrop-blur-md rounded-[32px] p-8 text-xl font-black leading-relaxed shadow-sm text-[#1D1B20] whitespace-pre-wrap min-h-[150px] flex items-center">
+          {meal?.DDISH_NM ? (meal.DDISH_NM || '').replace(/<br\/>/gi, '\n') : <span className="opacity-40 text-center w-full block">급식 정보가 없습니다. 🍱</span>}
+        </div>
+        {meal && <p className="text-right mt-5 font-black text-sm opacity-80 uppercase tracking-widest">{meal.CAL_INFO}</p>}
+      </div>
+    );
+  };
+  return (
+    <div className="space-y-6 animate-spring">
+      <Card dateStr={dates.tdStr} title="오늘 급식" isToday />
+      <Card dateStr={dates.tmStr} title="내일 급식" />
+    </div>
+  );
+}
+
+// ==========================================
+// 탭: 학급
+// ==========================================
+function ClassTab({ data, isAdmin, openModal, db, appId }) {
+  const todayStr = new Date().toISOString().split('T')[0];
+  return (
+    <div className="space-y-10 pb-10 animate-spring">
+      <div>
+        <div className="flex justify-between items-center px-2 mb-5">
+          <h2 className="text-3xl font-black">수행/일정</h2>
+          {isAdmin && <button onClick={()=>openModal('SCHED')} className="btn-spring bg-[#6750A4] text-white px-5 py-2.5 rounded-full text-sm font-black shadow-lg">일정 추가</button>}
+        </div>
+        <div className="grid gap-4">
+          {data.schedules.map(s => {
+            const diff = Math.ceil((new Date(s.date) - new Date(todayStr)) / (1000*60*60*24));
+            return (
+              <div key={s.id} className="bg-white border border-[#E7E0EC] p-6 rounded-[32px] flex justify-between items-center relative group shadow-sm animate-spring">
+                <div>
+                  <h3 className="font-black text-xl text-[#1D1B20]">{s.title}</h3>
+                  <p className="text-sm text-[#6750A4] font-black opacity-80 mt-1">{s.date}</p>
+                </div>
+                <div className={`px-5 py-3 rounded-[20px] font-black text-base shadow-sm ${diff <= 3 && diff >= 0 ? 'bg-[#F2B8B5] text-[#8C1D18]' : 'bg-[#EADDFF] text-[#21005D]'}`}>
+                  {diff === 0 ? 'D-Day' : (diff > 0 ? `D-${diff}` : '종료')}
+                </div>
+                {isAdmin && <button onClick={()=>deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'schedules', s.id))} className="btn-spring absolute -top-3 -right-3 bg-red-100 text-red-600 w-10 h-10 rounded-full flex items-center justify-center font-black shadow-md hidden group-hover:flex transition-all"><Icons.X /></button>}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      <div>
+        <div className="flex justify-between items-center px-2 mb-5">
+          <h2 className="text-3xl font-black">학습 자료</h2>
+          {isAdmin && <button onClick={()=>openModal('FILE')} className="btn-spring bg-[#EADDFF] text-[#21005D] px-5 py-2.5 rounded-full text-sm font-black shadow-sm">자료 추가</button>}
+        </div>
+        <div className="grid gap-4">
+          {data.materials.map(m => (
+            <a key={m.id} href={m.link} target="_blank" rel="noreferrer" className="bg-[#FDF7FF] border border-[#EADDFF]/50 p-6 rounded-[32px] flex justify-between items-center relative group hover:bg-[#F3EDF7] transition-colors animate-spring">
+              <div className="flex items-center gap-5">
+                <div className="bg-white p-4 rounded-[20px] text-[#6750A4] shadow-sm"><Icons.Class /></div>
+                <div>
+                  <h3 className="font-black text-[#1D1B20] text-lg">{m.title}</h3>
+                  <span className="text-xs bg-[#EADDFF] text-[#21005D] px-3 py-1 rounded-md font-black mt-2 inline-block">{m.subject||'공통'}</span>
+                </div>
+              </div>
+              {isAdmin && <button onClick={(e) => {e.preventDefault(); deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'materials', m.id))}} className="btn-spring absolute top-4 right-4 text-red-500 bg-red-50 px-3 py-1.5 rounded-full text-[10px] font-black hidden group-hover:block">삭제</button>}
+            </a>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+
