@@ -19,21 +19,30 @@
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700;900&display=swap');
         body { font-family: 'Noto Sans KR', sans-serif; background-color: #FDF7FF; -webkit-tap-highlight-color: transparent; }
+        
+        /* 스크롤바 디자인 (PC용) */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #EADDFF; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: #D0BCFF; }
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-        @keyframes fade-in { from { opacity: 0; transform: translateY(15px) scale(0.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
+        
+        @keyframes fade-in { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
         .animate-fade { animation: fade-in 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
         .btn-press:active { transform: scale(0.95); transition: transform 0.1s; }
+        @keyframes toast-slide { 0% { transform: translateY(-30px); opacity: 0; } 100% { transform: translateY(0); opacity: 1; } }
+        .toast-enter { animation: toast-slide 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
     </style>
 </head>
-<body>
+<body class="md:bg-[#F3EDF7]">
     <div id="root"></div>
 
     <script type="text/babel">
         const { useState, useEffect } = React;
 
         // ==========================================
-        // 1. Firebase 고정 설정 (무조건 duru108 연결)
+        // 1. Firebase 설정 (duru108 고정 연결)
         // ==========================================
         const firebaseConfig = {
             apiKey: "AIzaSyAP8WRXAjmPdmATfWKnCrCRQNH0ftbBV9w",
@@ -46,16 +55,12 @@
 
         let isFirebaseReady = false;
         try {
-            if (!firebase.apps.length) {
-                firebase.initializeApp(firebaseConfig);
-            }
+            if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
             isFirebaseReady = true;
         } catch (e) { console.error("Firebase Init Error", e); }
 
         const db = isFirebaseReady ? firebase.firestore() : null;
         const auth = isFirebaseReady ? firebase.auth() : null;
-        
-        // 기기(Netlify/미리보기) 상관없이 완벽하게 하나의 폴더만 쓰도록 하드코딩!
         const APP_ID = "duru-class-1-8";
 
         // ==========================================
@@ -71,7 +76,8 @@
             Check: () => <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="3" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg>,
             Settings: () => <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>,
             Users: () => <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/></svg>,
-            X: () => <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+            X: () => <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>,
+            Guest: () => <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
         };
 
         // ==========================================
@@ -80,13 +86,10 @@
         function App() {
             const [loading, setLoading] = useState(true);
             const [isLogged, setIsLogged] = useState(false);
-            const [user, setUser] = useState(null);
+            const [user, setUser] = useState(null); // {id, isAdmin, isGuest}
             const [activeTab, setActiveTab] = useState('home');
             
-            // 🔥 치명적 오류(권한 거부 등)를 화면 전체에 띄우는 상태
-            const [criticalDbError, setCriticalDbError] = useState(false);
-
-            // 안정적인 하단 토스트 메시지
+            // 토스트 알림 관리
             const [toast, setToast] = useState(null);
             useEffect(() => {
                 if (toast) {
@@ -114,7 +117,7 @@
             };
             const dates = getDates();
 
-            // --- 로그인 및 세션 유지 ---
+            // --- 로그인 및 세션 유지, 익명인증 강제 우회 로직 ---
             useEffect(() => {
                 if (!auth) return;
                 const savedSession = localStorage.getItem('duru_session');
@@ -124,28 +127,24 @@
                 }
 
                 const initAuth = async () => {
-                    try { await auth.signInAnonymously(); } 
-                    catch (e) { console.error("Auth", e); }
+                    try { 
+                        await auth.signInAnonymously(); 
+                    } catch (e) { 
+                        console.error("Auth Error (콘솔 설정 누락 무시):", e); 
+                        // 에러가 나도 앱이 뻗지 않도록 무시합니다 (Firestore 규칙이 열려있어 작동함).
+                    }
+                    setLoading(false);
                 };
                 initAuth();
-                
-                const unsubscribe = auth.onAuthStateChanged((u) => { if (u) setLoading(false); });
-                return () => unsubscribe();
             }, []);
 
-            // --- 데이터베이스 실시간 동기화 ---
+            // --- 데이터베이스 실시간 동기화 (모든 데이터 연동) ---
             useEffect(() => {
-                if (!isLogged || !user || !auth.currentUser) return;
+                if (!isLogged || !user) return;
                 
-                // 공용 및 개인 데이터 경로
                 const base = (col) => db.collection('artifacts').doc(APP_ID).collection('public').doc('data').collection(col);
-                const privateBase = () => db.collection('artifacts').doc(APP_ID).collection('users').doc(user.id).collection('planner');
                 
-                // 🔥 데이터베이스 차단(규칙 에러) 감지기
-                const errHandler = (e) => {
-                    console.error("DB Sync Error:", e);
-                    if(e.code === 'permission-denied') setCriticalDbError(true);
-                };
+                const errHandler = (e) => console.error("DB Sync Error:", e);
                 
                 const unsubs = [
                     base('announcements').onSnapshot(s => setData(p => ({...p, announcements: s.docs.map(d=>({id:d.id, ...d.data()})).sort((a,b)=>b.at-a.at)})), errHandler),
@@ -154,16 +153,24 @@
                     base('cleaning').onSnapshot(s => { const o={}; s.docs.forEach(d=>o[d.id]=d.data().names); setData(p=>({...p, cleaning: o})); }, errHandler),
                     base('memos').onSnapshot(s => { const o={}; s.docs.forEach(d=>o[d.id]=d.data().content); setData(p=>({...p, memos: o})); }, errHandler),
                     base('override_meals').onSnapshot(s => { const o={}; s.docs.forEach(d=>o[d.id]=d.data()); setData(p=>({...p, overrides: {...p.overrides, meals: o}})); }, errHandler),
-                    base('override_time').onSnapshot(s => { const o={}; s.docs.forEach(d=>o[d.id]=d.data().periods); setData(p=>({...p, overrides: {...p.overrides, time: o}})); }, errHandler),
-                    
-                    // 플래너는 로그인한 학번(user.id)을 기준으로 완벽 동기화됨!
-                    privateBase().onSnapshot(s => {
-                        setData(p => ({...p, planner: s.docs.map(d=>({id:d.id, ...d.data()})).sort((a,b)=>b.at-a.at)}));
-                    }, errHandler)
+                    base('override_time').onSnapshot(s => { const o={}; s.docs.forEach(d=>o[d.id]=d.data().periods); setData(p=>({...p, overrides: {...p.overrides, time: o}})); }, errHandler)
                 ];
                 
-                // 관리자 학생 관리 정보 동기화
-                if (user.isAdmin) unsubs.push(base('profiles').onSnapshot(s => setData(p => ({...p, allUsers: s.docs.map(d=>d.data()).sort((a,b)=>parseInt(a.sid)-parseInt(b.sid))})), errHandler));
+                // 게스트가 아닌 정식 유저의 플래너 동기화
+                if (!user.isGuest) {
+                    const fbUid = auth?.currentUser?.uid || `fallback_${user.id}`;
+                    unsubs.push(
+                        db.collection('artifacts').doc(APP_ID).collection('users').doc(user.id).collection('planner')
+                        .onSnapshot(s => {
+                            setData(p => ({...p, planner: s.docs.map(d=>({id:d.id, ...d.data()})).sort((a,b)=>b.at-a.at)}));
+                        }, errHandler)
+                    );
+                }
+
+                if (user.isAdmin) {
+                    unsubs.push(base('profiles').onSnapshot(s => setData(p => ({...p, allUsers: s.docs.map(d=>d.data()).sort((a,b)=>parseInt(a.sid)-parseInt(b.sid))})), errHandler));
+                }
+                
                 return () => unsubs.forEach(fn => fn());
             }, [isLogged, user]);
 
@@ -188,8 +195,14 @@
                 f();
             }, []);
 
-            // --- 데이터 저장/수정 통합 핸들러 ---
+            // --- 데이터 저장/수정 핸들러 ---
             const handleModalSubmit = async (vals) => {
+                if (user.isGuest && modal.type !== 'SETTINGS') {
+                    showToast("게스트는 데이터를 수정할 수 없습니다.", true);
+                    setModal({open: false, type: '', payload: {}});
+                    return;
+                }
+
                 const { type, payload } = modal;
                 const base = (col) => db.collection('artifacts').doc(APP_ID).collection('public').doc('data').collection(col);
                 
@@ -246,54 +259,18 @@
 
                 } catch(e) { 
                     console.error(e);
-                    if(e.code === 'permission-denied') setCriticalDbError(true);
-                    else showToast("입력 오류. 양식을 확인하세요.", true);
+                    showToast("입력 오류. 권한 또는 양식을 확인하세요.", true);
                 }
             };
-
-            // 🔥 차단 시 화면을 완전히 덮는 에러 해결 가이드
-            if (criticalDbError) {
-                return (
-                    <div className="h-screen flex flex-col items-center justify-center p-6 bg-[#FDF7FF] text-left z-50 fixed inset-0 overflow-y-auto">
-                        <div className="max-w-md w-full animate-fade">
-                            <div className="text-6xl mb-4 text-center">🚨</div>
-                            <h1 className="text-3xl font-black text-red-600 mb-2 text-center tracking-tighter">데이터베이스 공유 차단됨</h1>
-                            <p className="text-sm font-bold text-gray-600 mb-6 text-center">현재 <span className="text-[#6750A4]">duru108</span> 데이터베이스가 잠겨있어 기기 간 정보 공유 및 저장이 불가능합니다.</p>
-                            
-                            <div className="bg-white p-6 rounded-[24px] shadow-lg border border-red-100 mb-6 space-y-3 text-sm font-bold text-[#1D1B20]">
-                                <h3 className="text-lg font-black text-[#8C1D18] mb-4">🔧 관리자(Admin) 해결 방법</h3>
-                                <p>1. <a href="https://console.firebase.google.com/" target="_blank" className="text-blue-500 underline">Firebase 콘솔</a>에 접속합니다.</p>
-                                <p>2. <span className="bg-gray-100 px-1 rounded">duru108</span> 프로젝트 선택 후, 좌측 메뉴에서 <span className="bg-gray-100 px-1 rounded">Firestore Database</span> 클릭</p>
-                                <p>3. 상단의 <span className="bg-gray-100 px-1 rounded">규칙 (Rules)</span> 탭을 클릭합니다.</p>
-                                <p>4. 적혀있는 내용을 전부 지우고 <b>아래 코드를 복사해서 붙여넣습니다.</b></p>
-                                
-                                <div className="bg-[#1e1e1e] text-green-400 p-4 rounded-xl text-xs overflow-x-auto mt-2 font-mono leading-relaxed">
-                                    rules_version = '2';<br/>
-                                    service cloud.firestore {'{'}<br/>
-                                    &nbsp;&nbsp;match /databases/{'{database}'}/documents {'{'}<br/>
-                                    &nbsp;&nbsp;&nbsp;&nbsp;match /{'{document=**}'} {'{'}<br/>
-                                    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span className="text-yellow-400">allow read, write: if true;</span><br/>
-                                    &nbsp;&nbsp;&nbsp;&nbsp;{'}'}<br/>
-                                    &nbsp;&nbsp;{'}'}<br/>
-                                    {'}'}
-                                </div>
-                                <p className="pt-2 text-[#8C1D18]">5. 마지막으로 우측 상단의 <b>[게시]</b> 버튼을 누르세요!</p>
-                            </div>
-                            
-                            <button onClick={()=>window.location.reload()} className="btn-press w-full bg-[#6750A4] text-white font-black px-8 py-5 rounded-[24px] shadow-lg text-lg">해결 후 앱 다시 켜기</button>
-                        </div>
-                    </div>
-                );
-            }
 
             if (loading) return <div className="h-screen flex items-center justify-center font-black text-[#6750A4] text-xl">Duru 로딩중...</div>;
             
             return (
-                <div className="min-h-screen pb-28 relative">
-                    {/* 토스트 알림창 */}
+                <div className="min-h-screen relative flex flex-col md:flex-row">
+                    {/* 공통 토스트 알림창 */}
                     {toast && (
-                        <div className="fixed bottom-24 left-0 w-full z-[100] flex justify-center pointer-events-none px-4">
-                            <div key={toast.id} className={`max-w-sm w-full p-4 rounded-full font-black shadow-lg text-center border transition-all ${toast.isError ? 'bg-red-50 text-red-600 border-red-200' : 'bg-[#1D1B20] text-white border-transparent'}`}>
+                        <div className="fixed bottom-24 md:bottom-10 left-0 w-full z-[100] flex justify-center pointer-events-none px-4">
+                            <div key={toast.id} className={`max-w-sm w-full p-4 rounded-full font-black shadow-xl text-center border transition-all ${toast.isError ? 'bg-red-50 text-red-600 border-red-200' : 'bg-[#1D1B20] text-white border-transparent'}`}>
                                 {toast.msg}
                             </div>
                         </div>
@@ -302,40 +279,66 @@
                     {!isLogged ? (
                         <LoginScreen db={db} appId={APP_ID} onLogin={(u) => { 
                             setUser(u); setIsLogged(true); 
-                            localStorage.setItem('duru_session', JSON.stringify(u)); 
-                        }} showToast={showToast} setCriticalDbError={setCriticalDbError} />
+                            if(!u.isGuest) localStorage.setItem('duru_session', JSON.stringify(u)); 
+                        }} showToast={showToast} />
                     ) : (
                         <>
-                            {modal.open && <Modal type={modal.type} payload={modal.payload} data={data} onClose={()=>setModal({open:false})} onSubmit={handleModalSubmit} />}
+                            {modal.open && <Modal type={modal.type} payload={modal.payload} data={data} onClose={()=>setModal({open:false})} onSubmit={handleModalSubmit} user={user} />}
                             
-                            {/* 헤더 */}
-                            <header className="sticky top-0 z-40 bg-[#FDF7FF]/90 backdrop-blur-xl border-b border-[#E7E0EC] px-6 h-16 flex items-center justify-between">
+                            {/* PC (데스크탑) 전용 좌측 사이드바 */}
+                            <aside className="hidden md:flex flex-col w-64 h-screen bg-white border-r border-[#E7E0EC] fixed left-0 top-0 py-10 px-6 z-50 shadow-sm">
+                                <div className="mb-12 pl-2">
+                                    <h1 className="text-4xl font-black text-[#1D1B20] tracking-tighter">Duru</h1>
+                                    <p className="font-bold text-[#6750A4] text-sm mt-1 tracking-wide">고촌고 1-8 포털</p>
+                                </div>
+                                <nav className="flex flex-col gap-3">
+                                    <NavBtn id="home" active={activeTab} set={setActiveTab} icon={Icons.Home} label="홈 대시보드" desktop />
+                                    <NavBtn id="time" active={activeTab} set={setActiveTab} icon={Icons.Time} label="시간표" desktop />
+                                    <NavBtn id="meal" active={activeTab} set={setActiveTab} icon={Icons.Meal} label="오늘의 급식" desktop />
+                                    <NavBtn id="class" active={activeTab} set={setActiveTab} icon={Icons.Class} label="플래너 및 자료" desktop />
+                                </nav>
+                                <div className="mt-auto bg-[#FDF7FF] p-5 rounded-[24px] border border-[#EADDFF]/50 relative">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-10 h-10 bg-[#EADDFF] text-[#21005D] rounded-full flex items-center justify-center font-black"><Icons.Users/></div>
+                                        <div>
+                                            <p className="text-sm font-black text-[#1D1B20]">{user.isGuest ? '게스트' : user.id}</p>
+                                            <p className="text-[10px] font-black text-[#6750A4] uppercase">{user.isAdmin ? 'Admin' : (user.isGuest ? 'Guest Mode' : 'Student')}</p>
+                                        </div>
+                                    </div>
+                                    <button onClick={()=>setModal({open:true, type:'SETTINGS'})} className="absolute top-4 right-4 text-[#6750A4] p-2 hover:bg-[#EADDFF] rounded-full transition"><Icons.Settings/></button>
+                                </div>
+                            </aside>
+
+                            {/* 모바일 전용 상단 헤더 */}
+                            <header className="md:hidden sticky top-0 z-40 bg-[#FDF7FF]/90 backdrop-blur-xl border-b border-[#E7E0EC] px-6 h-16 flex items-center justify-between">
                                 <div className="flex items-center gap-2">
                                     <h1 className="text-2xl font-black text-[#1D1B20] tracking-tighter">Duru <span className="text-[#6750A4] text-sm">for 1-8</span></h1>
-                                    <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse ml-1" title="동기화 중"></div>
                                 </div>
                                 <div className="flex items-center gap-3">
                                     <div className="text-right">
-                                        <p className="text-sm font-black text-[#1D1B20]">{user.id}</p>
-                                        <p className="text-[9px] font-black text-[#6750A4] uppercase tracking-widest">{user.isAdmin ? 'Admin' : 'Student'}</p>
+                                        <p className="text-sm font-black text-[#1D1B20]">{user.isGuest ? '게스트' : user.id}</p>
+                                        <p className="text-[9px] font-black text-[#6750A4] uppercase tracking-widest">{user.isAdmin ? 'Admin' : (user.isGuest ? 'Guest' : 'Student')}</p>
                                     </div>
                                     <button onClick={()=>setModal({open:true, type:'SETTINGS'})} className="btn-press bg-[#F3EDF7] p-2.5 rounded-full text-[#6750A4]"><Icons.Settings/></button>
                                 </div>
                             </header>
 
-                            {/* 메인 탭 렌더링 */}
-                            <main className="max-w-xl mx-auto p-5">
-                                {activeTab === 'home' && <HomeTab data={data} apiData={apiData} dates={dates} isAdmin={user.isAdmin} openModal={(t,p)=>setModal({open:true, type:t, payload:p})} db={db} appId={APP_ID} showToast={showToast} setCriticalDbError={setCriticalDbError} />}
-                                {activeTab === 'time' && <TimeTab data={data} apiData={apiData} dates={dates} isAdmin={user.isAdmin} openModal={(t,p)=>setModal({open:true, type:t, payload:p})} />}
-                                {activeTab === 'meal' && <MealTab data={data} apiData={apiData} dates={dates} isAdmin={user.isAdmin} openModal={(t,p)=>setModal({open:true, type:t, payload:p})} />}
-                                {activeTab === 'class' && <ClassTab data={data} isAdmin={user.isAdmin} openModal={(t,p)=>setModal({open:true, type:t, payload:p})} db={db} appId={APP_ID} showToast={showToast} uid={user.id} setCriticalDbError={setCriticalDbError} />}
+                            {/* 메인 콘텐츠 영역 (PC에서는 우측으로 밀림) */}
+                            <main className="flex-1 md:ml-64 bg-[#FDF7FF] md:bg-transparent min-h-screen pb-24 md:pb-10 md:p-10 p-5 overflow-y-auto">
+                                <div className="max-w-5xl mx-auto w-full">
+                                    {activeTab === 'home' && <HomeTab data={data} apiData={apiData} dates={dates} isAdmin={user.isAdmin} openModal={(t,p)=>setModal({open:true, type:t, payload:p})} db={db} appId={APP_ID} showToast={showToast} />}
+                                    {activeTab === 'time' && <TimeTab data={data} apiData={apiData} dates={dates} isAdmin={user.isAdmin} openModal={(t,p)=>setModal({open:true, type:t, payload:p})} />}
+                                    {activeTab === 'meal' && <MealTab data={data} apiData={apiData} dates={dates} isAdmin={user.isAdmin} openModal={(t,p)=>setModal({open:true, type:t, payload:p})} />}
+                                    {activeTab === 'class' && <ClassTab data={data} isAdmin={user.isAdmin} isGuest={user.isGuest} openModal={(t,p)=>setModal({open:true, type:t, payload:p})} db={db} appId={APP_ID} showToast={showToast} uid={user.id} />}
+                                </div>
                             </main>
 
-                            <nav className="fixed bottom-0 left-0 right-0 bg-[#F3EDF7]/95 backdrop-blur-xl h-20 flex justify-around items-center px-2 border-t border-[#E7E0EC] z-40 shadow-[0_-10px_30px_rgba(103,80,164,0.05)]">
+                            {/* 모바일 전용 하단 네비게이션 */}
+                            <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-[#F3EDF7]/95 backdrop-blur-xl h-20 flex justify-around items-center px-2 border-t border-[#E7E0EC] z-40 shadow-[0_-10px_30px_rgba(103,80,164,0.05)]">
                                 <NavBtn id="home" active={activeTab} set={setActiveTab} icon={Icons.Home} label="홈" />
                                 <NavBtn id="time" active={activeTab} set={setActiveTab} icon={Icons.Time} label="시간표" />
                                 <NavBtn id="meal" active={activeTab} set={setActiveTab} icon={Icons.Meal} label="급식" />
-                                <NavBtn id="class" active={activeTab} set={setActiveTab} icon={Icons.Class} label="플래너/자료" />
+                                <NavBtn id="class" active={activeTab} set={setActiveTab} icon={Icons.Class} label="플랜/자료" />
                             </nav>
                         </>
                     )}
@@ -344,9 +347,9 @@
         }
 
         // ==========================================
-        // 로그인 화면 (세션/에러 핸들링 강화)
+        // 로그인 및 게스트 모드 화면 
         // ==========================================
-        function LoginScreen({ db, appId, onLogin, showToast, setCriticalDbError }) {
+        function LoginScreen({ db, appId, onLogin, showToast }) {
             const [sid, setSid] = useState(''); const [pw, setPw] = useState('');
             const [err, setErr] = useState(''); const [needsReg, setNeedsReg] = useState(false);
             const [loading, setLoading] = useState(false);
@@ -362,13 +365,12 @@
                     const snap = await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('profiles').doc(sid).get();
                     if(snap.exists) {
                         if(snap.data().pw === pw) {
-                            onLogin({id: sid, isAdmin: sid==='10800'});
+                            onLogin({id: sid, isAdmin: sid==='10800', isGuest: false});
                             showToast("로그인 성공!");
                         } else setErr("비밀번호가 일치하지 않습니다.");
                     } else setNeedsReg(true);
                 } catch(e) { 
-                    if(e.code === 'permission-denied') setCriticalDbError(true);
-                    else setErr("네트워크 오류가 발생했습니다.");
+                    setErr("DB 연결 오류가 발생했습니다.");
                 }
                 setLoading(false);
             };
@@ -377,46 +379,51 @@
                 setLoading(true);
                 try {
                     await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('profiles').doc(sid).set({pw, sid, isAdmin: sid==='10800', at:Date.now()});
-                    onLogin({id: sid, isAdmin: sid==='10800'});
+                    onLogin({id: sid, isAdmin: sid==='10800', isGuest: false});
                     showToast("가입 및 자동 로그인 완료!");
-                } catch(e) { 
-                    if(e.code === 'permission-denied') setCriticalDbError(true);
-                    else setErr("가입 오류 발생"); 
-                }
+                } catch(e) { setErr("가입 오류"); }
                 setLoading(false);
             };
 
             return (
-                <div className="h-screen flex items-center justify-center bg-[#FDF7FF] p-6 animate-fade">
-                    <div className="w-full max-w-sm bg-white rounded-[40px] p-8 shadow-2xl border border-[#EADDFF]/50">
-                        <div className="text-center mb-10">
+                <div className="h-screen w-full flex items-center justify-center bg-[#FDF7FF] p-6 animate-fade">
+                    <div className="w-full max-w-sm bg-white rounded-[40px] p-8 shadow-2xl border border-[#EADDFF]/50 relative overflow-hidden">
+                        <div className="absolute top-0 right-0 w-32 h-32 bg-[#EADDFF] rounded-full -mr-16 -mt-16 blur-3xl opacity-50"></div>
+                        <div className="text-center mb-10 relative z-10">
                             <div className="w-20 h-20 bg-[#EADDFF] text-[#381E72] rounded-[24px] flex items-center justify-center mx-auto mb-4 shadow-inner"><Icons.Lock/></div>
                             <h2 className="text-4xl font-black text-[#1D1B20] tracking-tighter">Duru</h2>
-                            <p className="font-bold text-[#6750A4] text-xs mt-2">고촌고 1학년 8반 포털</p>
+                            <p className="font-bold text-[#6750A4] text-xs mt-2 tracking-widest uppercase">고촌고 1-8 프리미엄 포털</p>
                         </div>
-                        <form onSubmit={handleLogin} className="space-y-4">
-                            <input type="number" placeholder="학번 (10800~10834)" value={sid} onChange={e=>{setSid(e.target.value); setNeedsReg(false);}} className="w-full bg-[#F3EDF7] p-5 rounded-[24px] outline-none font-black text-center text-lg text-[#1D1B20]" />
-                            <input type="password" placeholder="비밀번호" value={pw} onChange={e=>{setPw(e.target.value); setNeedsReg(false);}} className="w-full bg-[#F3EDF7] p-5 rounded-[24px] outline-none font-black text-center text-lg text-[#1D1B20]" />
-                            {err && <p className="text-red-500 font-bold text-xs text-center bg-red-50 py-3 rounded-xl">{err}</p>}
+                        <form onSubmit={handleLogin} className="space-y-4 relative z-10">
+                            <input type="number" placeholder="학번 (10800~10834)" value={sid} onChange={e=>{setSid(e.target.value); setNeedsReg(false);}} className="w-full bg-[#F3EDF7] p-5 rounded-[24px] outline-none font-black text-center text-lg text-[#1D1B20] transition-shadow focus:shadow-inner" />
+                            <input type="password" placeholder="비밀번호" value={pw} onChange={e=>{setPw(e.target.value); setNeedsReg(false);}} className="w-full bg-[#F3EDF7] p-5 rounded-[24px] outline-none font-black text-center text-lg text-[#1D1B20] transition-shadow focus:shadow-inner" />
+                            {err && <p className="text-red-500 font-bold text-xs text-center bg-red-50 py-3 rounded-xl animate-fade">{err}</p>}
                             {needsReg ? (
-                                <div className="bg-[#EADDFF] p-5 rounded-[24px] text-center">
+                                <div className="bg-[#EADDFF] p-5 rounded-[24px] text-center animate-fade">
                                     <p className="font-black text-[#21005D] text-sm mb-4">등록되지 않은 학번입니다.<br/>이 비밀번호로 처음 가입할까요?</p>
                                     <div className="flex gap-2">
                                         <button type="button" onClick={()=>setNeedsReg(false)} className="btn-press flex-1 py-4 bg-white text-[#6750A4] font-black rounded-[16px] shadow-sm">취소</button>
                                         <button type="button" onClick={handleReg} className="btn-press flex-1 py-4 bg-[#6750A4] text-white font-black rounded-[16px] shadow-sm">가입하기</button>
                                     </div>
                                 </div>
-                            ) : <button type="submit" className="btn-press w-full bg-[#6750A4] text-white py-5 font-black text-lg rounded-[24px] shadow-lg shadow-[#6750A4]/30">{loading ? '로딩중...' : '접속하기'}</button>}
+                            ) : <button type="submit" className="btn-press w-full bg-[#6750A4] text-white py-5 font-black text-lg rounded-[24px] shadow-lg shadow-[#6750A4]/30">{loading ? '로딩중...' : '학번으로 접속'}</button>}
                         </form>
+                        
+                        <div className="mt-8 pt-6 border-t border-gray-100 text-center relative z-10">
+                            <button onClick={() => { onLogin({id: '게스트', isAdmin: false, isGuest: true}); showToast("게스트 모드로 접속했습니다."); }} className="btn-press w-full flex items-center justify-center gap-2 bg-gray-50 text-gray-500 py-4 rounded-[20px] font-black text-sm border border-gray-200">
+                                <Icons.Guest /> 게스트로 둘러보기
+                            </button>
+                            <p className="text-[10px] text-gray-400 mt-3 font-bold">게스트는 데이터를 수정할 수 없습니다.</p>
+                        </div>
                     </div>
                 </div>
             );
         }
 
         // ==========================================
-        // 탭 콘텐츠 UI (홈, 시간표, 급식, 클래스)
+        // 탭 콘텐츠 UI (반응형 Grid 적용)
         // ==========================================
-        function HomeTab({ data, apiData, dates, isAdmin, openModal, db, appId, showToast, setCriticalDbError }) {
+        function HomeTab({ data, apiData, dates, isAdmin, openModal, db, appId, showToast }) {
             const duty = (dates.dayIdx > 0 && dates.dayIdx < 6) ? (data.cleaning[dates.dayIdx] || '미지정') : '주말 휴식';
             const meal = data.overrides.meals[dates.tdStr] || apiData.meals[dates.tdStr];
             
@@ -429,66 +436,70 @@
                 if (!isNaN(targetDate)) examDiff = Math.ceil((targetDate - new Date(todayStr)) / (1000*60*60*24));
             }
 
-            const deleteDoc = async (col, id) => {
-                try {
-                    await db.collection('artifacts').doc(appId).collection('public').doc('data').collection(col).doc(id).delete();
-                    showToast("삭제되었습니다.");
-                } catch(e) { 
-                    if(e.code === 'permission-denied') setCriticalDbError(true);
-                    else showToast("삭제 오류가 발생했습니다.", true); 
-                }
-            };
-
             return (
                 <div className="space-y-6 animate-fade">
-                    {closestExam && examDiff >= 0 && (
-                        <div className="bg-gradient-to-r from-[#8C1D18] to-[#B3261E] p-6 rounded-[32px] shadow-lg text-white flex justify-between items-center relative overflow-hidden">
-                            <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-10 -mt-10 blur-xl"></div>
-                            <div className="z-10">
-                                <p className="text-xs font-black text-red-200 mb-1">🚨 다음 시험까지</p>
-                                <h2 className="text-2xl font-black">{closestExam.title}</h2>
-                            </div>
-                            <div className="z-10 bg-white text-[#8C1D18] px-5 py-3 rounded-[20px] font-black text-xl shadow-inner">
-                                {examDiff === 0 ? 'D-Day' : `D-${examDiff}`}
-                            </div>
-                        </div>
-                    )}
-
-                    <div className="bg-[#EADDFF] p-6 rounded-[36px] shadow-sm relative">
-                        <div className="flex justify-between items-center mb-5">
-                            <h2 className="font-black text-xl text-[#21005D]">📢 Duru 공지</h2>
-                            {isAdmin && <button onClick={()=>openModal('NOTICE')} className="btn-press w-10 h-10 bg-[#6750A4] text-white rounded-full flex justify-center items-center shadow-md"><Icons.Plus/></button>}
-                        </div>
-                        <div className="space-y-3">
-                            {data.announcements.slice(0,2).map(a => (
-                                <div key={a.id} className="bg-white/70 p-5 rounded-[24px] relative border border-white">
-                                    <h3 className="font-black text-[#1D1B20] text-base">{a.title}</h3>
-                                    <p className="text-sm font-bold text-[#49454F] mt-1">{a.content}</p>
-                                    {isAdmin && <button onClick={()=>deleteDoc('announcements', a.id)} className="btn-press absolute top-4 right-4 text-[10px] text-red-500 font-black bg-white px-3 py-1.5 rounded-full shadow-sm">삭제</button>}
+                    {/* 데스크탑에서 컬럼을 나누는 반응형 그리드 적용 */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        
+                        {/* 1열: 공지사항 (모바일 100%, PC 1단) */}
+                        <div className="md:col-span-1 space-y-6">
+                            {closestExam && examDiff >= 0 && (
+                                <div className="bg-gradient-to-r from-[#8C1D18] to-[#B3261E] p-6 rounded-[32px] shadow-lg text-white flex justify-between items-center relative overflow-hidden">
+                                    <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-10 -mt-10 blur-xl"></div>
+                                    <div className="z-10">
+                                        <p className="text-xs font-black text-red-200 mb-1">🚨 다음 시험까지</p>
+                                        <h2 className="text-2xl font-black">{closestExam.title}</h2>
+                                    </div>
+                                    <div className="z-10 bg-white text-[#8C1D18] px-5 py-3 rounded-[20px] font-black text-xl shadow-inner">{examDiff === 0 ? 'D-Day' : `D-${examDiff}`}</div>
                                 </div>
-                            ))}
-                            {data.announcements.length === 0 && <p className="text-sm font-bold opacity-50 text-center py-2 text-[#6750A4]">새로운 소식이 없습니다.</p>}
+                            )}
+
+                            <div className="bg-[#EADDFF] p-6 rounded-[36px] shadow-sm relative h-full">
+                                <div className="flex justify-between items-center mb-5">
+                                    <h2 className="font-black text-xl text-[#21005D]">📢 Duru 공지</h2>
+                                    {isAdmin && <button onClick={()=>openModal('NOTICE')} className="btn-press w-10 h-10 bg-[#6750A4] text-white rounded-full flex justify-center items-center shadow-md"><Icons.Plus/></button>}
+                                </div>
+                                <div className="space-y-3">
+                                    {data.announcements.map(a => (
+                                        <div key={a.id} className="bg-white/70 p-5 rounded-[24px] relative border border-white transition hover:bg-white">
+                                            <h3 className="font-black text-[#1D1B20] text-base">{a.title}</h3>
+                                            <p className="text-sm font-bold text-[#49454F] mt-1 break-words">{a.content}</p>
+                                            {isAdmin && <button onClick={()=>db.collection('artifacts').doc(appId).collection('public').doc('data').collection('announcements').doc(a.id).delete()} className="btn-press absolute top-4 right-4 text-[10px] text-red-500 font-black bg-white px-3 py-1.5 rounded-full shadow-sm">삭제</button>}
+                                        </div>
+                                    ))}
+                                    {data.announcements.length === 0 && <p className="text-sm font-bold opacity-50 text-center py-4 text-[#6750A4]">새로운 소식이 없습니다.</p>}
+                                </div>
+                            </div>
                         </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="bg-white p-6 rounded-[32px] border border-[#E7E0EC] text-center shadow-sm">
-                            <p className="text-[11px] font-black text-[#6750A4] mb-3">🧹 오늘 청소</p>
-                            <div className="bg-[#F3EDF7] py-4 rounded-[20px] font-black text-[#21005D] text-lg">{duty}</div>
-                            {isAdmin && <button onClick={()=>openModal('CLEAN', {default:{day:dates.dayIdx}})} className="mt-3 text-[10px] bg-[#EADDFF] px-4 py-2 rounded-full text-[#6750A4] font-black">편집</button>}
+
+                        {/* 2열: 요약 패널 */}
+                        <div className="md:col-span-1 space-y-6">
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="bg-white p-6 rounded-[32px] border border-[#E7E0EC] text-center shadow-sm">
+                                    <p className="text-[11px] font-black text-[#6750A4] mb-3">🧹 오늘 청소</p>
+                                    <div className="bg-[#F3EDF7] py-5 rounded-[20px] font-black text-[#21005D] text-lg">{duty}</div>
+                                    {isAdmin && <button onClick={()=>openModal('CLEAN', {default:{day:dates.dayIdx}})} className="mt-3 text-[10px] bg-[#EADDFF] px-4 py-2 rounded-full text-[#6750A4] font-black w-full">편집</button>}
+                                </div>
+                                <div className="bg-white p-6 rounded-[32px] border border-[#E7E0EC] text-center shadow-sm flex flex-col justify-center">
+                                    <p className="text-[11px] font-black text-[#6750A4] mb-3">📅 다가오는 일정</p>
+                                    <div className="bg-[#F3EDF7] py-5 rounded-[20px] font-black text-[#21005D] text-base truncate px-2">{data.schedules[0]?.title || '없음'}</div>
+                                </div>
+                            </div>
                         </div>
-                        <div className="bg-white p-6 rounded-[32px] border border-[#E7E0EC] text-center shadow-sm">
-                            <p className="text-[11px] font-black text-[#6750A4] mb-3">📅 다음 수행/일정</p>
-                            <div className="bg-[#F3EDF7] py-4 rounded-[20px] font-black text-[#21005D] text-base truncate px-2">{data.schedules[0]?.title || '없음'}</div>
+
+                        {/* 3열: 급식 */}
+                        <div className="md:col-span-1 lg:col-span-1">
+                            <div className="bg-white p-6 rounded-[36px] border border-[#E7E0EC] shadow-sm h-full flex flex-col">
+                                <div className="flex justify-between items-center mb-4">
+                                    <h3 className="font-black text-lg text-[#1D1B20]">🍱 오늘의 급식</h3>
+                                    {isAdmin && <button onClick={()=>openModal('EDIT_MEAL', {date:dates.tdStr, default:{menu:meal?.DDISH_NM, cal:meal?.CAL_INFO}})} className="btn-press text-[10px] bg-[#F3EDF7] px-3 py-1.5 rounded-full font-black text-[#6750A4]">편집</button>}
+                                </div>
+                                <div className="flex-1 bg-[#FDF7FF] p-6 rounded-[24px] font-bold text-base whitespace-pre-wrap leading-relaxed border border-[#EADDFF]/50 text-[#1D1B20] flex items-center justify-center text-center">
+                                    {meal?.DDISH_NM ? meal.DDISH_NM.replace(/<br\/>/gi, '\n') : <span className="opacity-50">급식 정보가 없습니다.</span>}
+                                </div>
+                            </div>
                         </div>
-                    </div>
-                    <div className="bg-white p-6 rounded-[36px] border border-[#E7E0EC] shadow-sm">
-                        <div className="flex justify-between items-center mb-4">
-                            <h3 className="font-black text-lg text-[#1D1B20]">🍱 오늘의 급식</h3>
-                            {isAdmin && <button onClick={()=>openModal('EDIT_MEAL', {date:dates.tdStr, default:{menu:meal?.DDISH_NM, cal:meal?.CAL_INFO}})} className="btn-press text-[10px] bg-[#F3EDF7] px-3 py-1.5 rounded-full font-black text-[#6750A4]">수동 편집</button>}
-                        </div>
-                        <div className="bg-[#FDF7FF] p-6 rounded-[24px] font-bold text-base whitespace-pre-wrap leading-relaxed border border-[#EADDFF]/50 text-[#1D1B20]">
-                            {meal?.DDISH_NM ? meal.DDISH_NM.replace(/<br\/>/gi, '\n') : <span className="opacity-50">급식 정보가 없습니다.</span>}
-                        </div>
+
                     </div>
                 </div>
             );
@@ -500,17 +511,17 @@
             const targetDay = new Date(targetStr).getDay();
             
             let list = []; let type = 'NEIS 연동';
-            if (data.overrides.time[targetStr]) { list = data.overrides.time[targetStr].map((s,i)=>({PERIO:String(i+1), ITRT_CNTNT:s})); type='일간 수동편집'; }
-            else if (data.overrides.time['day_'+targetDay]) { list = data.overrides.time['day_'+targetDay].map((s,i)=>({PERIO:String(i+1), ITRT_CNTNT:s})); type='주간 수동설정'; }
+            if (data.overrides.time[targetStr]) { list = data.overrides.time[targetStr].map((s,i)=>({PERIO:String(i+1), ITRT_CNTNT:s})); type='수동편집됨'; }
+            else if (data.overrides.time['day_'+targetDay]) { list = data.overrides.time['day_'+targetDay].map((s,i)=>({PERIO:String(i+1), ITRT_CNTNT:s})); type='주간설정됨'; }
             else { list = apiData.timetable[targetStr] || []; }
 
             const wDefs = {}; [1,2,3,4,5].forEach(i => { if(data.overrides.time['day_'+i]) wDefs['day'+i] = data.overrides.time['day_'+i].join(','); });
 
             return (
-                <div className="space-y-6 animate-fade">
+                <div className="space-y-6 animate-fade max-w-2xl mx-auto">
                     <div className="flex bg-white rounded-full p-1.5 border border-[#E7E0EC] shadow-sm">
-                        <button onClick={()=>setView('today')} className={`flex-1 py-3 rounded-full text-sm font-black transition-colors ${view==='today'?'bg-[#EADDFF] text-[#21005D]':'text-[#49454F]'}`}>오늘</button>
-                        <button onClick={()=>setView('tomorrow')} className={`flex-1 py-3 rounded-full text-sm font-black transition-colors ${view==='tomorrow'?'bg-[#EADDFF] text-[#21005D]':'text-[#49454F]'}`}>내일</button>
+                        <button onClick={()=>setView('today')} className={`flex-1 py-3 rounded-full text-sm font-black transition-colors ${view==='today'?'bg-[#EADDFF] text-[#21005D]':'text-[#49454F]'}`}>오늘 ({dates.tdStr.slice(5)})</button>
+                        <button onClick={()=>setView('tomorrow')} className={`flex-1 py-3 rounded-full text-sm font-black transition-colors ${view==='tomorrow'?'bg-[#EADDFF] text-[#21005D]':'text-[#49454F]'}`}>내일 ({dates.tmStr.slice(5)})</button>
                     </div>
                     <div className="flex justify-between items-center px-2">
                         <h2 className="text-3xl font-black text-[#1D1B20]">시간표</h2>
@@ -519,22 +530,22 @@
                     {isAdmin && (
                         <div className="flex gap-2 px-2 -mt-2">
                             <button onClick={()=>openModal('EDIT_WEEK_TIME', {default:wDefs})} className="btn-press bg-[#EADDFF] px-4 py-2.5 rounded-[14px] text-[11px] font-black text-[#21005D]">주간 설정</button>
-                            <button onClick={()=>openModal('EDIT_TIME', {date:targetStr, default:{periods:list.map(l=>l.ITRT_CNTNT).join(',')}})} className="btn-press bg-[#F3EDF7] px-4 py-2.5 rounded-[14px] text-[11px] font-black text-[#6750A4]">{targetStr.slice(5)} 개별 수정</button>
+                            <button onClick={()=>openModal('EDIT_TIME', {date:targetStr, default:{periods:list.map(l=>l.ITRT_CNTNT).join(',')}})} className="btn-press bg-[#F3EDF7] px-4 py-2.5 rounded-[14px] text-[11px] font-black text-[#6750A4]">하루 변경</button>
                         </div>
                     )}
                     <div className="space-y-4">
                         {list.length > 0 ? list.map(t => (
-                            <div key={t.PERIO} className="bg-white border border-[#E7E0EC] p-5 rounded-[32px] flex justify-between items-center shadow-sm">
+                            <div key={t.PERIO} className="bg-white border border-[#E7E0EC] p-5 md:p-6 rounded-[32px] flex justify-between items-center shadow-sm hover:shadow-md transition">
                                 <div className="flex items-center gap-6">
                                     <span className="w-14 h-14 bg-[#6750A4] text-white rounded-[24px] flex items-center justify-center font-black text-2xl shadow-inner">{t.PERIO}</span>
                                     <div>
                                         <h4 className="font-black text-2xl text-[#1D1B20]">{t.ITRT_CNTNT}</h4>
-                                        {data.memos[`${targetStr}_${t.PERIO}`] && <p className="text-[11px] text-[#6750A4] font-black mt-2 bg-[#FDF7FF] px-3 py-1.5 rounded-xl border border-[#EADDFF]/50">💡 {data.memos[`${targetStr}_${t.PERIO}`]}</p>}
+                                        {data.memos[`${targetStr}_${t.PERIO}`] && <p className="text-[12px] text-[#6750A4] font-black mt-2 bg-[#FDF7FF] px-4 py-2 rounded-xl border border-[#EADDFF]/50 inline-block">💡 {data.memos[`${targetStr}_${t.PERIO}`]}</p>}
                                     </div>
                                 </div>
                                 <button onClick={()=>openModal('MEMO', {id:`${targetStr}_${t.PERIO}`, default:{content:data.memos[`${targetStr}_${t.PERIO}`]}})} className="btn-press p-4 bg-[#F3EDF7] rounded-full text-[#6750A4]"><Icons.Time/></button>
                             </div>
-                        )) : <div className="py-24 text-center opacity-40 font-black text-xl">수업이 없습니다.</div>}
+                        )) : <div className="py-24 text-center opacity-40 font-black text-xl bg-white rounded-[32px] border border-dashed">수업이 없습니다.</div>}
                     </div>
                 </div>
             );
@@ -544,135 +555,166 @@
             const MealCard = ({ dStr, title, today }) => {
                 const meal = data.overrides.meals[dStr] || apiData.meals[dStr];
                 return (
-                    <div className={`p-8 rounded-[40px] shadow-sm ${today?'bg-[#D0BCFF] text-[#381E72]':'bg-[#F3EDF7] text-[#1D1B20]'}`}>
+                    <div className={`p-8 md:p-10 rounded-[40px] shadow-sm flex flex-col h-full ${today?'bg-[#D0BCFF] text-[#381E72]':'bg-white border border-[#E7E0EC] text-[#1D1B20]'}`}>
                         <div className="flex justify-between items-center mb-6">
-                            <h2 className="text-3xl font-black">{title}</h2>
+                            <h2 className="text-3xl font-black">{title} <span className="text-sm opacity-60 ml-2">{dStr.slice(5)}</span></h2>
                             {isAdmin && <button onClick={()=>openModal('EDIT_MEAL', {date:dStr, default:{menu:meal?.DDISH_NM, cal:meal?.CAL_INFO}})} className="btn-press bg-black/10 px-4 py-2 text-[11px] font-black rounded-full text-current">수정</button>}
                         </div>
-                        <div className="bg-white/90 p-8 rounded-[32px] font-black text-xl leading-relaxed whitespace-pre-wrap text-[#1D1B20] min-h-[150px] shadow-sm flex items-center">
-                            {meal?.DDISH_NM ? meal.DDISH_NM.replace(/<br\/>/gi, '\n') : <span className="opacity-40 w-full text-center block">급식이 없습니다. 🍱</span>}
+                        <div className={`flex-1 p-8 rounded-[32px] font-black text-xl leading-relaxed whitespace-pre-wrap min-h-[150px] shadow-sm flex items-center justify-center text-center ${today ? 'bg-white/90 text-[#1D1B20]' : 'bg-[#FDF7FF] text-[#1D1B20]'}`}>
+                            {meal?.DDISH_NM ? meal.DDISH_NM.replace(/<br\/>/gi, '\n') : <span className="opacity-40 w-full block">급식이 없습니다. 🍱</span>}
                         </div>
-                        {meal && <p className="text-right mt-5 font-black text-sm uppercase opacity-80 tracking-widest">{meal.CAL_INFO}</p>}
+                        {meal && <p className="text-right mt-6 font-black text-sm uppercase opacity-80 tracking-widest">{meal.CAL_INFO}</p>}
                     </div>
                 );
             };
             return (
-                <div className="space-y-6 animate-fade">
+                <div className="space-y-6 md:space-y-0 md:grid md:grid-cols-2 md:gap-8 animate-fade max-w-4xl mx-auto">
                     <MealCard dStr={dates.tdStr} title="오늘 급식" today={true} />
                     <MealCard dStr={dates.tmStr} title="내일 급식" today={false} />
                 </div>
             );
         }
 
-        function ClassTab({ data, isAdmin, openModal, db, appId, showToast, uid, setCriticalDbError }) {
+        function ClassTab({ data, isAdmin, isGuest, openModal, db, appId, showToast, uid }) {
             const [viewDate, setViewDate] = useState(new Date().toISOString().split('T')[0]);
-            const tasks = data.planner.filter(p => p.date === viewDate);
+            
+            // 게스트 모드 로컬 플래너 처리
+            const [guestPlanner, setGuestPlanner] = useState(() => {
+                if(isGuest) return JSON.parse(localStorage.getItem('duru_guest_planner') || '[]');
+                return [];
+            });
+            
+            useEffect(() => {
+                if(isGuest) localStorage.setItem('duru_guest_planner', JSON.stringify(guestPlanner));
+            }, [guestPlanner, isGuest]);
+
+            const allTasks = isGuest ? guestPlanner : data.planner;
+            const tasks = allTasks.filter(p => p.date === viewDate);
+            
             const tmStr = new Date(new Date().getTime() + 86400000).toISOString().split('T')[0];
             const todayStr = new Date().toISOString().split('T')[0];
 
             const togglePlan = async (t) => {
+                if (isGuest) {
+                    setGuestPlanner(prev => prev.map(p => p.id === t.id ? {...p, done: !p.done} : p));
+                    return;
+                }
                 try { await db.collection('artifacts').doc(appId).collection('users').doc(uid).collection('planner').doc(t.id).set({done:!t.done}, {merge:true}); }
-                catch(e) { 
-                    if(e.code === 'permission-denied') setCriticalDbError(true);
-                    else showToast("수정 오류", true); 
+                catch(e) { showToast("수정 오류", true); }
+            };
+
+            const delTask = async (id) => {
+                if (isGuest) {
+                    setGuestPlanner(prev => prev.filter(p => p.id !== id));
+                    return;
+                }
+                try { await db.collection('artifacts').doc(appId).collection('users').doc(uid).collection('planner').doc(id).delete(); }
+                catch(e) { showToast("삭제 오류", true); }
+            }
+
+            // 게스트 모드에서 플래너 추가를 가로채는 헬퍼
+            const handlePlanAdd = () => {
+                if (isGuest) {
+                    const text = prompt("게스트 플래너에 추가할 할 일을 입력하세요:");
+                    if (text) {
+                        setGuestPlanner(prev => [...prev, { id: 'guest_'+Date.now(), text, done: false, date: viewDate, at: Date.now() }]);
+                        showToast("기기에 임시 저장되었습니다.");
+                    }
+                } else {
+                    openModal('PLAN_ADD', {date:viewDate});
                 }
             };
 
-            const delDoc = async (col, id, isPrivate=false) => {
-                try {
-                    const path = isPrivate ? db.collection('artifacts').doc(appId).collection('users').doc(uid).collection(col) 
-                                           : db.collection('artifacts').doc(appId).collection('public').doc('data').collection(col);
-                    await path.doc(id).delete();
-                    showToast("삭제 완료");
-                } catch(e) { 
-                    if(e.code === 'permission-denied') setCriticalDbError(true);
-                    else showToast("삭제 권한이 없습니다.", true); 
-                }
-            }
-
             return (
-                <div className="space-y-10 pb-10 animate-fade">
-                    {/* 플래너 */}
-                    <div className="bg-[#F3EDF7] p-8 rounded-[40px] shadow-inner">
+                <div className="space-y-10 md:space-y-0 md:grid md:grid-cols-12 md:gap-8 pb-10 animate-fade max-w-5xl mx-auto">
+                    
+                    {/* 플래너 영역 (데스크탑: 왼쪽 5칸) */}
+                    <div className="md:col-span-5 bg-[#F3EDF7] p-8 rounded-[40px] shadow-inner h-fit">
                         <div className="flex justify-between items-center mb-6">
                             <h2 className="text-2xl font-black text-[#21005D]">✅ 내 플래너</h2>
-                            <button onClick={()=>openModal('PLAN_ADD', {date:viewDate})} className="btn-press w-12 h-12 bg-[#6750A4] text-white rounded-full flex justify-center items-center font-black shadow-lg"><Icons.Plus/></button>
+                            <button onClick={handlePlanAdd} className="btn-press w-12 h-12 bg-[#6750A4] text-white rounded-full flex justify-center items-center font-black shadow-lg"><Icons.Plus/></button>
                         </div>
+                        {isGuest && <p className="text-[10px] text-[#6750A4] font-bold mb-4 bg-[#EADDFF] px-3 py-2 rounded-xl text-center">게스트 플래너는 현재 기기에만 임시 저장됩니다.</p>}
+                        
                         <div className="flex gap-2 mb-6 bg-white/50 p-1.5 rounded-full">
-                            <button onClick={()=>setViewDate(new Date().toISOString().split('T')[0])} className={`flex-1 py-2.5 rounded-full text-sm font-black transition-colors ${viewDate!==tmStr?'bg-[#EADDFF] text-[#21005D] shadow-sm':'text-[#49454F]'}`}>오늘</button>
+                            <button onClick={()=>setViewDate(todayStr)} className={`flex-1 py-2.5 rounded-full text-sm font-black transition-colors ${viewDate===todayStr?'bg-[#EADDFF] text-[#21005D] shadow-sm':'text-[#49454F]'}`}>오늘</button>
                             <button onClick={()=>setViewDate(tmStr)} className={`flex-1 py-2.5 rounded-full text-sm font-black transition-colors ${viewDate===tmStr?'bg-[#EADDFF] text-[#21005D] shadow-sm':'text-[#49454F]'}`}>내일</button>
                         </div>
                         <div className="space-y-3">
                             {tasks.length > 0 ? tasks.map(t => (
                                 <div key={t.id} className="bg-white p-5 rounded-[24px] flex justify-between items-center shadow-sm">
                                     <button onClick={()=>togglePlan(t)} className="flex items-center gap-4 flex-1 text-left">
-                                        <div className={`w-7 h-7 rounded-full border-2 flex items-center justify-center transition-colors ${t.done?'bg-[#6750A4] border-[#6750A4] text-white':'border-[#CAC4D0] text-transparent'}`}><Icons.Check/></div>
-                                        <span className={`font-bold text-lg transition-all ${t.done?'line-through text-[#CAC4D0]':'text-[#1D1B20]'}`}>{t.text}</span>
+                                        <div className={`w-7 h-7 min-w-[28px] rounded-full border-2 flex items-center justify-center transition-colors ${t.done?'bg-[#6750A4] border-[#6750A4] text-white':'border-[#CAC4D0] text-transparent'}`}><Icons.Check/></div>
+                                        <span className={`font-bold text-base md:text-lg transition-all break-words ${t.done?'line-through text-[#CAC4D0]':'text-[#1D1B20]'}`}>{t.text}</span>
                                     </button>
-                                    <button onClick={()=>delDoc('planner', t.id, true)} className="btn-press text-[10px] text-red-500 font-black bg-red-50 px-3 py-2 rounded-full">삭제</button>
+                                    <button onClick={()=>delTask(t.id)} className="btn-press ml-3 text-[10px] text-red-500 font-black bg-red-50 px-3 py-2 rounded-full whitespace-nowrap">삭제</button>
                                 </div>
-                            )) : <div className="text-center py-10 text-[#6750A4] font-bold opacity-50">할 일을 추가해보세요.</div>}
+                            )) : <div className="text-center py-10 text-[#6750A4] font-bold opacity-50 bg-white/50 rounded-[24px] border border-dashed border-[#CAC4D0]">할 일이 없습니다.</div>}
                         </div>
                     </div>
 
-                    {/* 일정 */}
-                    <div>
-                        <div className="flex justify-between items-center px-2 mb-5">
-                            <h2 className="text-3xl font-black">수행/일정</h2>
-                            {isAdmin && <button onClick={()=>openModal('SCHED')} className="btn-press bg-[#6750A4] text-white px-5 py-2.5 rounded-full text-sm font-black shadow-md">일정 추가</button>}
-                        </div>
-                        <div className="grid gap-4">
-                            {data.schedules.map(s => {
-                                const tDate = new Date(s.date);
-                                let diff = '설정안됨';
-                                if (!isNaN(tDate)) {
-                                    diff = Math.ceil((tDate - new Date(todayStr)) / (1000*60*60*24));
-                                }
-                                
-                                return (
-                                    <div key={s.id} className={`bg-white border p-6 rounded-[32px] flex justify-between items-center relative shadow-sm ${s.isExam ? 'border-[#B3261E]' : 'border-[#E7E0EC]'}`}>
-                                        <div>
-                                            <h3 className="font-black text-xl text-[#1D1B20]">{s.title}</h3>
-                                            <div className="flex items-center gap-2 mt-2">
-                                                {s.isExam && <span className="bg-[#F9DEDC] text-[#8C1D18] px-2 py-0.5 rounded text-[10px] font-black">시험/중요</span>}
-                                                <p className="text-sm text-[#6750A4] font-black opacity-80">{s.date}</p>
+                    {/* 일정 및 자료 영역 (데스크탑: 오른쪽 7칸) */}
+                    <div className="md:col-span-7 space-y-10">
+                        {/* 일정 */}
+                        <div>
+                            <div className="flex justify-between items-center px-2 mb-5">
+                                <h2 className="text-3xl font-black">수행/일정</h2>
+                                {isAdmin && !isGuest && <button onClick={()=>openModal('SCHED')} className="btn-press bg-[#6750A4] text-white px-5 py-2.5 rounded-full text-sm font-black shadow-md">일정 추가</button>}
+                            </div>
+                            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-2">
+                                {data.schedules.map(s => {
+                                    const tDate = new Date(s.date);
+                                    let diff = '설정안됨';
+                                    if (!isNaN(tDate)) diff = Math.ceil((tDate - new Date(todayStr)) / (1000*60*60*24));
+                                    
+                                    return (
+                                        <div key={s.id} className={`bg-white border p-6 rounded-[32px] flex justify-between items-center relative shadow-sm hover:-translate-y-1 transition-transform ${s.isExam ? 'border-[#B3261E]' : 'border-[#E7E0EC]'}`}>
+                                            <div>
+                                                <h3 className="font-black text-xl text-[#1D1B20]">{s.title}</h3>
+                                                <div className="flex items-center gap-2 mt-2">
+                                                    {s.isExam && <span className="bg-[#F9DEDC] text-[#8C1D18] px-2 py-0.5 rounded text-[10px] font-black">시험/중요</span>}
+                                                    <p className="text-sm text-[#6750A4] font-black opacity-80">{s.date}</p>
+                                                </div>
                                             </div>
+                                            <div className={`px-4 py-3 rounded-[20px] font-black text-sm whitespace-nowrap shadow-sm ${diff<=3&&diff>=0?'bg-[#F2B8B5] text-[#8C1D18]':'bg-[#EADDFF] text-[#21005D]'}`}>
+                                                {diff === '설정안됨' ? '-' : (diff===0?'D-Day':(diff>0?`D-${diff}`:'종료'))}
+                                            </div>
+                                            {isAdmin && !isGuest && <button onClick={()=>db.collection('artifacts').doc(appId).collection('public').doc('data').collection('schedules').doc(s.id).delete()} className="btn-press absolute -top-2 -right-2 text-red-500 bg-red-50 w-8 h-8 rounded-full flex items-center justify-center font-black shadow-sm text-xs"><Icons.X/></button>}
                                         </div>
-                                        <div className={`px-5 py-3 rounded-[20px] font-black text-base shadow-sm ${diff<=3&&diff>=0?'bg-[#F2B8B5] text-[#8C1D18]':'bg-[#EADDFF] text-[#21005D]'}`}>
-                                            {diff === '설정안됨' ? '-' : (diff===0?'D-Day':(diff>0?`D-${diff}`:'종료'))}
+                                    );
+                                })}
+                                {data.schedules.length === 0 && <p className="col-span-full text-center opacity-40 font-bold py-6">등록된 일정이 없습니다.</p>}
+                            </div>
+                        </div>
+                        {/* 자료 */}
+                        <div>
+                            <div className="flex justify-between items-center px-2 mb-5">
+                                <h2 className="text-3xl font-black">자료 공유</h2>
+                                {isAdmin && !isGuest && <button onClick={()=>openModal('FILE')} className="btn-press bg-[#EADDFF] text-[#21005D] px-5 py-2.5 rounded-full text-sm font-black shadow-sm">자료 추가</button>}
+                            </div>
+                            <div className="grid gap-4 lg:grid-cols-2">
+                                {data.materials.map(m => (
+                                    <a key={m.id} href={m.link} target="_blank" className="bg-[#FDF7FF] border border-[#EADDFF]/50 p-6 rounded-[32px] flex justify-between items-center relative shadow-sm hover:shadow-md transition">
+                                        <div className="flex gap-4 items-center overflow-hidden">
+                                            <div className="bg-white p-4 rounded-[20px] text-[#6750A4] shadow-sm shrink-0"><Icons.Class/></div>
+                                            <div className="truncate"><h3 className="font-black text-lg text-[#1D1B20] truncate">{m.title}</h3><span className="text-[11px] bg-[#EADDFF] text-[#21005D] px-2 py-0.5 rounded font-black mt-2 inline-block">{m.subject||'공통'}</span></div>
                                         </div>
-                                        {isAdmin && <button onClick={()=>delDoc('schedules', s.id)} className="btn-press absolute -top-2 -right-2 text-red-500 bg-red-50 w-8 h-8 rounded-full flex items-center justify-center font-black shadow-sm text-xs"><Icons.X/></button>}
-                                    </div>
-                                );
-                            })}
+                                        {isAdmin && !isGuest && <button onClick={(e)=>{e.preventDefault(); db.collection('artifacts').doc(appId).collection('public').doc('data').collection('materials').doc(m.id).delete();}} className="btn-press absolute -top-2 -right-2 text-red-500 bg-red-50 w-8 h-8 rounded-full flex items-center justify-center font-black shadow-sm text-xs"><Icons.X/></button>}
+                                    </a>
+                                ))}
+                                {data.materials.length === 0 && <p className="col-span-full text-center opacity-40 font-bold py-6">공유된 자료가 없습니다.</p>}
+                            </div>
                         </div>
                     </div>
-                    {/* 자료 */}
-                    <div>
-                        <div className="flex justify-between items-center px-2 mb-5 mt-10">
-                            <h2 className="text-3xl font-black">자료 공유</h2>
-                            {isAdmin && <button onClick={()=>openModal('FILE')} className="btn-press bg-[#EADDFF] text-[#21005D] px-5 py-2.5 rounded-full text-sm font-black shadow-sm">자료 추가</button>}
-                        </div>
-                        <div className="grid gap-4">
-                            {data.materials.map(m => (
-                                <a key={m.id} href={m.link} target="_blank" className="bg-[#FDF7FF] border border-[#EADDFF]/50 p-6 rounded-[32px] flex justify-between items-center relative shadow-sm">
-                                    <div className="flex gap-5 items-center">
-                                        <div className="bg-white p-4 rounded-[20px] text-[#6750A4] shadow-sm"><Icons.Class/></div>
-                                        <div><h3 className="font-black text-lg text-[#1D1B20]">{m.title}</h3><span className="text-[11px] bg-[#EADDFF] text-[#21005D] px-2 py-0.5 rounded font-black mt-2 inline-block">{m.subject||'공통'}</span></div>
-                                    </div>
-                                    {isAdmin && <button onClick={(e)=>{e.preventDefault(); delDoc('materials', m.id);}} className="btn-press absolute top-3 right-3 text-red-500 bg-red-50 px-3 py-1.5 text-[10px] rounded-full font-black">삭제</button>}
-                                </a>
-                            ))}
-                        </div>
-                    </div>
+
                 </div>
             );
         }
 
         // ==========================================
-        // 통합 모달 (설정 및 팝업 대용)
+        // 통합 모달 (입력창 및 설정)
         // ==========================================
-        function Modal({ type, payload, data, onClose, onSubmit }) {
+        function Modal({ type, payload, data, onClose, onSubmit, user }) {
             const [vals, setVals] = useState(payload?.default || {});
             const [viewUsers, setViewUsers] = useState(false);
 
@@ -691,33 +733,35 @@
             if (type === 'SETTINGS') {
                 return (
                     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-6 animate-fade">
-                        <div className="bg-[#FDF7FF] w-full max-w-sm rounded-[40px] p-8 shadow-2xl">
+                        <div className="bg-[#FDF7FF] w-full max-w-sm md:max-w-md rounded-[40px] p-8 md:p-10 shadow-2xl">
                             <div className="flex justify-between items-center mb-6">
                                 <h3 className="text-2xl font-black text-[#1D1B20]">설정</h3>
-                                <button onClick={onClose} className="p-2 bg-gray-100 rounded-full text-gray-500"><Icons.X/></button>
+                                <button onClick={onClose} className="p-2 bg-gray-100 hover:bg-gray-200 rounded-full text-gray-500 transition"><Icons.X/></button>
                             </div>
                             
                             {!viewUsers ? (
                                 <div className="space-y-4">
-                                    <button onClick={()=>onSubmit({type:'CHANGE_PW_MODAL_OPEN'})} className="btn-press w-full bg-white p-5 rounded-[24px] flex items-center gap-4 shadow-sm border border-[#E7E0EC] text-left">
-                                        <div className="bg-[#EADDFF] p-3 rounded-2xl text-[#6750A4]"><Icons.Lock/></div>
-                                        <div><h4 className="font-black text-lg text-[#1D1B20]">비밀번호 변경</h4><p className="text-[10px] font-bold text-[#49454F] mt-1">내 계정의 비밀번호를 변경합니다.</p></div>
-                                    </button>
-                                    {data.allUsers && data.allUsers.length > 0 && (
+                                    {!user?.isGuest && (
+                                        <button onClick={()=>onSubmit({type:'CHANGE_PW_MODAL_OPEN'})} className="btn-press w-full bg-white p-5 rounded-[24px] flex items-center gap-4 shadow-sm border border-[#E7E0EC] text-left">
+                                            <div className="bg-[#EADDFF] p-3 rounded-2xl text-[#6750A4]"><Icons.Lock/></div>
+                                            <div><h4 className="font-black text-lg text-[#1D1B20]">비밀번호 변경</h4><p className="text-[10px] font-bold text-[#49454F] mt-1">내 계정의 비밀번호를 변경합니다.</p></div>
+                                        </button>
+                                    )}
+                                    {data.allUsers && data.allUsers.length > 0 && !user?.isGuest && (
                                         <button onClick={()=>setViewUsers(true)} className="btn-press w-full bg-[#F3EDF7] p-5 rounded-[24px] flex items-center gap-4 shadow-sm border border-[#EADDFF]/50 text-left">
                                             <div className="bg-[#6750A4] p-3 rounded-2xl text-white"><Icons.Users/></div>
                                             <div><h4 className="font-black text-lg text-[#21005D]">학생 비밀번호 관리</h4><p className="text-[10px] font-bold text-[#6750A4] mt-1">관리자 전용 기능입니다.</p></div>
                                         </button>
                                     )}
-                                    <button onClick={()=>onSubmit({type:'LOGOUT'})} className="btn-press w-full bg-red-50 p-5 rounded-[24px] flex items-center gap-4 shadow-sm border border-red-100 text-left mt-6">
+                                    <button onClick={()=>onSubmit({type:'LOGOUT'})} className="btn-press w-full bg-red-50 p-5 rounded-[24px] flex items-center gap-4 shadow-sm border border-red-100 text-left mt-6 hover:bg-red-100 transition">
                                         <div className="bg-red-500 p-3 rounded-2xl text-white"><Icons.X/></div>
-                                        <div><h4 className="font-black text-lg text-red-600">로그아웃</h4><p className="text-[10px] font-bold text-red-400 mt-1">기기에서 로그아웃 합니다.</p></div>
+                                        <div><h4 className="font-black text-lg text-red-600">로그아웃 / 나가기</h4><p className="text-[10px] font-bold text-red-400 mt-1">로그인 화면으로 돌아갑니다.</p></div>
                                     </button>
                                 </div>
                             ) : (
                                 <div className="space-y-4">
-                                    <button onClick={()=>setViewUsers(false)} className="text-sm font-black text-[#6750A4] mb-2 inline-flex items-center gap-1">← 뒤로가기</button>
-                                    <div className="max-h-[50vh] overflow-y-auto space-y-2 pr-1 no-scrollbar">
+                                    <button onClick={()=>setViewUsers(false)} className="text-sm font-black text-[#6750A4] mb-2 inline-flex items-center gap-1 hover:underline">← 뒤로가기</button>
+                                    <div className="max-h-[50vh] overflow-y-auto space-y-2 pr-2 custom-scrollbar">
                                         {data.allUsers.map(u => (
                                             <div key={u.sid} className="bg-white p-4 rounded-[20px] flex justify-between items-center border border-[#E7E0EC] shadow-sm">
                                                 <span className="font-black text-lg text-[#1D1B20]">{u.sid}</span>
@@ -733,23 +777,23 @@
             }
 
             return (
-                <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-6 animate-fade">
-                    <div className="bg-white w-full max-w-sm rounded-[40px] p-8 shadow-2xl border border-[#EADDFF]/50">
+                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-6 animate-fade">
+                    <div className="bg-white w-full max-w-sm md:max-w-md rounded-[40px] p-8 md:p-10 shadow-2xl border border-[#EADDFF]/50">
                         <h3 className="text-2xl font-black mb-6 text-[#1D1B20]">{title}</h3>
                         <form onSubmit={e=>{e.preventDefault(); if(title==="설정") return; onSubmit(vals);}} className="space-y-4">
-                            <div className="max-h-[50vh] overflow-y-auto space-y-3 no-scrollbar pb-2">
-                                {inputs.map(i => <input key={i.k} type={i.type||'text'} placeholder={i.p} value={vals[i.k]||''} onChange={e=>setVals({...vals, [i.k]:e.target.value})} className="w-full bg-[#F3EDF7] p-5 rounded-[20px] font-black outline-none focus:ring-2 ring-[#6750A4] text-[#1D1B20]" /> )}
+                            <div className="max-h-[50vh] overflow-y-auto space-y-3 pr-2 custom-scrollbar pb-2">
+                                {inputs.map(i => <input key={i.k} type={i.type||'text'} placeholder={i.p} value={vals[i.k]||''} onChange={e=>setVals({...vals, [i.k]:e.target.value})} className="w-full bg-[#F3EDF7] p-5 rounded-[20px] font-black outline-none focus:ring-2 ring-[#6750A4] text-[#1D1B20] transition-shadow" /> )}
                                 
                                 {type === 'SCHED' && (
-                                    <label className="flex items-center gap-3 bg-[#FDF7FF] p-4 rounded-[20px] border border-[#EADDFF]/50">
+                                    <label className="flex items-center gap-3 bg-[#FDF7FF] p-4 rounded-[20px] border border-[#EADDFF]/50 cursor-pointer">
                                         <input type="checkbox" checked={vals.isExam||false} onChange={e=>setVals({...vals, isExam: e.target.checked})} className="w-5 h-5 accent-[#B3261E]" />
                                         <span className="font-black text-sm text-[#8C1D18]">시험 / 중요 평가 여부</span>
                                     </label>
                                 )}
                             </div>
                             <div className="flex gap-3 pt-4">
-                                <button type="button" onClick={onClose} className="btn-press flex-1 py-4 bg-[#F3EDF7] text-[#49454F] font-black rounded-[20px]">취소</button>
-                                <button type="submit" className="btn-press flex-1 py-4 bg-[#6750A4] text-white font-black rounded-[20px] shadow-md">저장</button>
+                                <button type="button" onClick={onClose} className="btn-press flex-1 py-4 bg-[#F3EDF7] text-[#49454F] font-black rounded-[20px] hover:bg-gray-200">취소</button>
+                                <button type="submit" className="btn-press flex-1 py-4 bg-[#6750A4] text-white font-black rounded-[20px] shadow-md hover:bg-[#523e85]">저장</button>
                             </div>
                         </form>
                     </div>
@@ -757,12 +801,21 @@
             );
         }
 
-        function NavBtn({id, active, set, icon:Icon, label}) {
+        // --- 네비게이션 버튼 (모바일 & 데스크탑 공용) ---
+        function NavBtn({id, active, set, icon:Icon, label, desktop}) {
             const isAct = active === id;
+            if (desktop) {
+                return (
+                    <button onClick={()=>set(id)} className={`flex items-center gap-4 w-full p-4 rounded-[20px] transition-all font-black text-left ${isAct ? 'bg-[#EADDFF] text-[#21005D]' : 'hover:bg-gray-50 text-[#49454F]'}`}>
+                        <div className={isAct ? 'scale-110 transition-transform' : ''}><Icon/></div>
+                        <span className="text-sm">{label}</span>
+                    </button>
+                );
+            }
             return (
                 <button onClick={()=>set(id)} className="btn-press flex flex-col items-center gap-1 w-16">
                     <div className={`p-2 px-5 rounded-full transition-colors ${isAct?'bg-[#EADDFF] text-[#21005D]':'text-[#49454F]'}`}><Icon/></div>
-                    <span className={`text-[10px] font-black ${isAct?'text-[#1D1B20]':'text-[#49454F]'}`}>{label}</span>
+                    <span className={`text-[10px] font-black ${isAct?'text-[#1D1B20]':'text-[#49454F]'}`}>{label.split(' ')[0]}</span>
                 </button>
             );
         }
