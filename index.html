@@ -1,970 +1,437 @@
-<!DOCTYPE html>
-<html lang="ko">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Duru - 학급 프리미엄 포털</title>
-    
-    <!-- 필수 라이브러리 로드 -->
-    <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
-    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <script src="https://cdn.tailwindcss.com"></script>
-    
-    <!-- Firebase SDK (호환 버전) -->
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { initializeApp } from 'firebase/app';
+import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from 'firebase/auth';
+import { 
+  getFirestore, collection, onSnapshot, doc, 
+  setDoc, addDoc, deleteDoc, getDoc, query 
+} from 'firebase/firestore';
 
-    <style>
-        /* One UI 스타일의 깔끔한 고딕 폰트 적용 */
-        @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
+// ==========================================
+// 1. Firebase 및 학교 설정 (고촌고 전용)
+// ==========================================
+const firebaseConfig = JSON.parse(__firebase_config);
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+const appId = typeof __app_id !== 'undefined' ? __app_id : 'duru-gochon-final-v1';
+
+// 고촌고등학교 API 정보 (제공해주신 키 적용)
+const NEIS_API_KEY = "5efc7dab32054459a3d3bd0b03068b76";
+const ATPT_CODE = "J10"; // 경기도교육청
+const SCHUL_CODE = "7551221"; // 고촌고등학교 표준코드
+
+const Icons = {
+  Home: () => <svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>,
+  Time: () => <svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>,
+  Meal: () => <svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>,
+  Class: () => <svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 002-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>,
+  Plus: () => <svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4"/></svg>,
+  Check: () => <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="3" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg>,
+  Settings: () => <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>,
+  X: () => <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+};
+
+// ==========================================
+// 2. 메인 애플리케이션
+// ==========================================
+export default function App() {
+  const [firebaseUser, setFirebaseUser] = useState(null);
+  const [currentUser, setCurrentUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState('home');
+  const [isScrolled, setIsScrolled] = useState(false);
+  const [modal, setModal] = useState({ open: false, type: '', payload: {} });
+  const [showLoginModal, setShowLoginModal] = useState(false);
+
+  // 전역 데이터 상태
+  const [data, setData] = useState({
+    announcements: [], schedules: [], materials: [], 
+    memos: {}, planner: [], overrides: { meals: {}, time: {} }
+  });
+  const [apiData, setApiData] = useState({ timetable: {}, meals: {} });
+
+  // 한국 시간(KST) 기반 날짜 연산 시스템
+  const dates = useMemo(() => {
+    const kstOffset = 9 * 60 * 60 * 1000;
+    const now = new Date();
+    const kst = new Date(now.getTime() + (now.getTimezoneOffset() * 60000) + kstOffset);
+    
+    const fmt = (d) => {
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const date = String(d.getDate()).padStart(2, '0');
+      return { str: `${year}-${month}-${date}`, neis: `${year}${month}${date}` };
+    };
+
+    const td = fmt(kst);
+    const tm = fmt(new Date(kst.getTime() + 86400000));
+    return { tdStr: td.str, tmStr: tm.str, tdNeis: td.neis, tmNeis: tm.neis, dayIdx: kst.getDay() };
+  }, []);
+
+  // --- 1. 인증 시스템 (Rule 3 준수) ---
+  useEffect(() => {
+    const initAuth = async () => {
+      try {
+        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+          await signInWithCustomToken(auth, __initial_auth_token);
+        } else {
+          await signInAnonymously(auth);
+        }
+      } catch (err) { console.error("Auth System Error", err); }
+    };
+    initAuth();
+    
+    const unsub = onAuthStateChanged(auth, (user) => { 
+      setFirebaseUser(user); 
+      setLoading(false); 
+      const saved = localStorage.getItem('duru_session_86');
+      if (saved) setCurrentUser(JSON.parse(saved));
+      else setCurrentUser({ id: '게스트', isGuest: true, isAdmin: false });
+    });
+    return () => unsub();
+  }, []);
+
+  // --- 2. Firestore 통합 연동 (Rule 1 & 2 준수) ---
+  useEffect(() => {
+    if (!firebaseUser || !currentUser) return;
+    const pub = (col) => collection(db, 'artifacts', appId, 'public', 'data', col);
+    const userId = currentUser.isGuest ? firebaseUser.uid : currentUser.id;
+    const priv = (col) => collection(db, 'artifacts', appId, 'users', userId, col);
+
+    const errorCb = (e) => console.log("Realtime Sync Error:", e.message);
+
+    const unsubList = [
+      onSnapshot(pub('announcements'), s => setData(p => ({...p, announcements: s.docs.map(d=>({id:d.id, ...d.data()})).sort((a,b)=>b.at-a.at)})), errorCb),
+      onSnapshot(pub('schedules'), s => setData(p => ({...p, schedules: s.docs.map(d=>({id:d.id, ...d.data()})).sort((a,b)=>new Date(a.date)-new Date(b.date))})), errorCb),
+      onSnapshot(pub('materials'), s => setData(p => ({...p, materials: s.docs.map(d=>({id:d.id, ...d.data()})).sort((a,b)=>b.at-a.at)})), errorCb),
+      onSnapshot(pub('memos'), s => { const o={}; s.docs.forEach(d=>o[d.id]=d.data().content); setData(p=>({...p, memos: o})); }, errorCb),
+      onSnapshot(pub('override_meals'), s => { const o={}; s.docs.forEach(d=>o[d.id]=d.data()); setData(p=>({...p, overrides: {...p.overrides, meals: o}})); }, errorCb),
+      onSnapshot(pub('override_time'), s => { const o={}; s.docs.forEach(d=>o[d.id]=d.data().periods); setData(p=>({...p, overrides: {...p.overrides, time: o}})); }, errorCb),
+      onSnapshot(priv('planner'), s => setData(p => ({...p, planner: s.docs.map(d=>({id:d.id, ...d.data()})).sort((a,b)=>b.at-a.at)})), errorCb)
+    ];
+    return () => unsubList.forEach(u => u());
+  }, [firebaseUser, currentUser]);
+
+  // --- 3. 나이스 API 고촌고 정밀 연동 (시간표/급식) ---
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        // 급식 (중식 고정: MMEAL_SC_CODE=2)
+        const mUrl = `https://open.neis.go.kr/hub/mealServiceDietInfo?Type=json&KEY=${NEIS_API_KEY}&ATPT_OFCDC_SC_CODE=${ATPT_CODE}&SD_SCHUL_CODE=${SCHUL_CODE}&MLSV_FROM_YMD=${dates.tdNeis}&MLSV_TO_YMD=${dates.tmNeis}&MMEAL_SC_CODE=2`;
+        // 고등학교 시간표 (hisTimetable)
+        const tUrl = `https://open.neis.go.kr/hub/hisTimetable?Type=json&KEY=${NEIS_API_KEY}&ATPT_OFCDC_SC_CODE=${ATPT_CODE}&SD_SCHUL_CODE=${SCHUL_CODE}&GRADE=1&CLASS_NM=8&TI_FROM_YMD=${dates.tdNeis}&TI_TO_YMD=${dates.tmNeis}`;
         
-        :root {
-            /* One UI Light Mode Palette */
-            --bg-body: #F2F2F7;         /* 앱 배경색 (연한 회색) */
-            --bg-panel: #FFFFFF;        /* 카드/패널 색 (순백색) */
-            --bg-item: #F2F2F7;         /* 내부 아이템 색 */
-            --bg-item-hover: #E5E5EA;   /* 내부 아이템 호버/액티브 */
-            
-            --text-main: #000000;       /* 메인 텍스트 */
-            --text-muted: #8E8E93;      /* 서브 텍스트 */
-            --accent: #007AFF;          /* One UI 메인 블루 */
-            --danger: #FF3B30;          /* 알림/에러 레드 */
-            
-            /* 부드럽고 통통 튀는 스프링 애니메이션 */
-            --spring: cubic-bezier(0.2, 0.8, 0.2, 1);
-            --spring-bouncy: cubic-bezier(0.32, 1.25, 0.32, 1);
+        const [mRes, tRes] = await Promise.all([fetch(mUrl), fetch(tUrl)]);
+        const mD = await mRes.json();
+        const tD = await tRes.json();
+
+        const newMeals = {};
+        if (mD.mealServiceDietInfo) {
+          mD.mealServiceDietInfo[1].row.forEach(r => {
+            const k = `${r.MLSV_YMD.substring(0,4)}-${r.MLSV_YMD.substring(4,6)}-${r.MLSV_YMD.substring(6,8)}`;
+            newMeals[k] = r;
+          });
         }
 
-        body { 
-            font-family: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, system-ui, Roboto, "Helvetica Neue", "Segoe UI", "Apple SD Gothic Neo", "Noto Sans KR", sans-serif; 
-            background-color: var(--bg-body); 
-            color: var(--text-main);
-            -webkit-tap-highlight-color: transparent; 
-            overflow-x: hidden;
-            margin: 0;
-            padding-bottom: constant(safe-area-inset-bottom);
-            padding-bottom: env(safe-area-inset-bottom);
-            letter-spacing: -0.01em;
+        const newTimetable = {};
+        if (tD.hisTimetable) {
+          tD.hisTimetable[1].row.forEach(r => {
+            const k = `${r.ALL_TI_YMD.substring(0,4)}-${r.ALL_TI_YMD.substring(4,6)}-${r.ALL_TI_YMD.substring(6,8)}`;
+            if (!newTimetable[k]) newTimetable[k] = [];
+            newTimetable[k].push(r);
+          });
+          Object.keys(newTimetable).forEach(k => newTimetable[k].sort((a,b) => parseInt(a.PERIO) - parseInt(b.PERIO)));
         }
 
+        setApiData({ meals: newMeals, timetable: newTimetable });
+      } catch (e) { console.error("NEIS Fetch Error", e); }
+    };
+    fetchData();
+  }, [dates]);
+
+  // 스크롤 감지 (One UI 스마트 바 효과)
+  useEffect(() => {
+    const handleScroll = () => setIsScrolled(window.scrollY > 30);
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  // --- 4. 데이터 저장 핸들러 ---
+  const handleAction = async (vals) => {
+    if (!firebaseUser) return;
+    const { type, payload } = modal;
+    const pub = (col) => collection(db, 'artifacts', appId, 'public', 'data', col);
+    const userId = currentUser.isGuest ? firebaseUser.uid : currentUser.id;
+    const priv = (col) => collection(db, 'artifacts', appId, 'users', userId, col);
+
+    try {
+      if (type === 'NOTICE') await addDoc(pub('announcements'), { title: vals.title, content: vals.content, at: Date.now() });
+      if (type === 'PLAN_ADD') await addDoc(priv('planner'), { text: vals.text, done: false, date: payload.date, at: Date.now() });
+      if (type === 'SCHED') await addDoc(pub('schedules'), { title: vals.title, date: vals.date, at: Date.now() });
+      if (type === 'FILE') await addDoc(pub('materials'), { title: vals.title, subject: vals.subject, link: vals.link, at: Date.now() });
+      if (type === 'MEMO') {
+        const ref = doc(pub('memos'), payload.id);
+        if (vals.content) await setDoc(ref, { content: vals.content, at: Date.now() }); else await deleteDoc(ref);
+      }
+    } catch (e) { alert("저장 중 오류가 발생했습니다."); }
+    setModal({ open: false, type: '', payload: {} });
+  };
+
+  if (loading) return <LoadingScreen />;
+
+  return (
+    <div className="flex min-h-screen text-[#1D1D1F] font-sans bg-[#F2F2F7] selection:bg-[#E5F1FF]">
+      <style dangerouslySetInnerHTML={{__html: `
+        .one-panel { background-color: #FFFFFF; border-radius: 32px; box-shadow: 0 4px 20px rgba(0,0,0,0.03), 0 0 1px rgba(0,0,0,0.05); }
+        .one-item { background-color: #F2F2F7; border-radius: 24px; transition: background-color 0.2s; }
+        .one-input { background-color: #F2F2F7; border-radius: 20px; font-weight: 600; border: 2px solid transparent; transition: all 0.2s; }
+        .one-input:focus { background-color: #FFFFFF; border-color: #007AFF; outline: none; }
+        .btn-press:active { transform: scale(0.96); opacity: 0.8; }
+        .btn-press { transition: transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.2s; }
         .no-scrollbar::-webkit-scrollbar { display: none; }
-        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+      `}} />
+
+      <CustomModal isOpen={modal.open} type={modal.type} payload={modal.payload} onClose={() => setModal({open:false})} onSubmit={handleAction} />
+      {showLoginModal && (
+        <AuthModal db={db} appId={appId} onClose={() => setShowLoginModal(false)} onAuth={(u) => {
+          setCurrentUser(u);
+          localStorage.setItem('duru_session_86', JSON.stringify(u));
+          setShowLoginModal(false);
+        }} />
+      )}
+
+      {/* 데스크톱 전용 사이드바 */}
+      <aside className="hidden md:flex flex-col w-[280px] fixed inset-y-0 left-0 bg-white/80 backdrop-blur-2xl border-r border-[#E5E5EA] z-50 p-8">
+        <h1 className="text-[34px] font-[900] tracking-tight mb-12">Duru</h1>
+        <nav className="flex-1 space-y-3">
+          <NavBtn id="home" active={activeTab} set={setActiveTab} icon={Icons.Home} label="홈" />
+          <NavBtn id="time" active={activeTab} set={setActiveTab} icon={Icons.Time} label="시간표" />
+          <NavBtn id="meal" active={activeTab} set={setActiveTab} icon={Icons.Meal} label="급식" />
+          <NavBtn id="class" active={activeTab} set={setActiveTab} icon={Icons.Class} label="학급" />
+        </nav>
+        <button onClick={() => currentUser.isGuest ? setShowLoginModal(true) : setModal({open:true, type:'SETTINGS'})} className="btn-press one-item p-5 flex items-center justify-between mt-auto">
+          <div className="text-left font-[800]">{currentUser.id}</div>
+          <Icons.Lock/>
+        </button>
+      </aside>
+      
+      <div className="flex-1 md:ml-[280px] relative w-full flex flex-col min-h-screen">
+        <header className="md:hidden sticky top-0 z-40 bg-[#F2F2F7]/90 backdrop-blur-xl px-6 pt-12 pb-4 flex items-center justify-between">
+          <h1 className="text-[28px] font-[900] tracking-tight">Duru</h1>
+          <button onClick={() => currentUser.isGuest ? setShowLoginModal(true) : setModal({open:true, type:'SETTINGS'})} className="btn-press bg-white w-10 h-10 rounded-full flex items-center justify-center shadow-sm">
+            {currentUser.isGuest ? <Icons.Lock /> : <Icons.Settings />}
+          </button>
+        </header>
+
+        <main className="max-w-xl md:max-w-none md:w-full mx-auto p-5 md:p-12 relative z-10 space-y-10 flex-1">
+          {activeTab === 'home' && <HomeTab data={data} apiData={apiData} dates={dates} isAdmin={currentUser.isAdmin} openModal={(t,p)=>setModal({open:true,type:t,payload:p})} db={db} appId={appId} />}
+          {activeTab === 'time' && <TimeTab data={data} apiData={apiData} dates={dates} isAdmin={currentUser.isAdmin} openModal={(t,p)=>setModal({open:true,type:t,payload:p})} />}
+          {activeTab === 'meal' && <MealTab data={data} apiData={apiData} dates={dates} isAdmin={currentUser.isAdmin} openModal={(t,p)=>setModal({open:true,type:t,payload:p})} />}
+          {activeTab === 'class' && <ClassTab data={data} isAdmin={currentUser.isAdmin} dates={dates} openModal={(t,p)=>setModal({open:true,type:t,payload:p})} db={db} appId={appId} uid={currentUser.isGuest ? firebaseUser.uid : currentUser.id} />}
+        </main>
+
+        {/* 📱 One UI 스마트 하단 바 (스크롤 축소 효과) */}
+        <div className={`md:hidden fixed left-1/2 -translate-x-1/2 z-50 transition-all duration-500 ease-[cubic-bezier(0.2,0.8,0.2,1)] ${isScrolled ? 'bottom-4 w-[240px]' : 'bottom-6 w-[calc(100%-40px)]'}`}>
+          <nav className={`bg-white/95 backdrop-blur-xl shadow-[0_8px_40px_rgba(0,0,0,0.1)] rounded-[100px] flex items-center justify-between transition-all duration-500 overflow-hidden ${isScrolled ? 'p-1.5 h-[58px]' : 'p-2.5 h-[78px]'}`}>
+            <BottomNavBtn id="home" active={activeTab} set={setActiveTab} icon={Icons.Home} label="홈" isScrolled={isScrolled} />
+            <BottomNavBtn id="time" active={activeTab} set={setActiveTab} icon={Icons.Time} label="시간표" isScrolled={isScrolled} />
+            <BottomNavBtn id="meal" active={activeTab} set={setActiveTab} icon={Icons.Meal} label="급식" isScrolled={isScrolled} />
+            <BottomNavBtn id="class" active={activeTab} set={setActiveTab} icon={Icons.Class} label="학급" isScrolled={isScrolled} />
+          </nav>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ==========================================
+// 하위 컴포넌트 라이브러리
+// ==========================================
+
+function NavBtn({ id, active, set, icon: Icon, label }) {
+  const isAct = active === id;
+  return (
+    <button onClick={() => set(id)} className={`btn-press w-full flex items-center gap-5 px-6 py-5 rounded-[24px] transition-colors ${isAct ? 'bg-[#007AFF] text-white shadow-lg' : 'text-[#8E8E93] hover:bg-black/5'}`}>
+      <Icon /><span className="font-[900] text-[17px]">{label}</span>
+    </button>
+  );
+}
+
+function BottomNavBtn({ id, active, set, icon: Icon, label, isScrolled }) {
+  const isAct = active === id;
+  return (
+    <button onClick={() => set(id)} className="btn-press relative flex-1 flex flex-col items-center justify-center h-full rounded-full transition-all duration-300">
+      <div className={`absolute inset-0 m-1 rounded-full transition-colors ${isAct ? 'bg-[#F2F2F7]' : ''}`}></div>
+      <div className={`relative z-10 transition-all duration-300 ${isAct ? 'text-[#000000]' : 'text-[#8E8E93]'} ${isScrolled ? 'scale-110' : 'scale-100'}`}><Icon /></div>
+      <span className={`relative z-10 text-[12px] font-[900] mt-1 overflow-hidden transition-all duration-300 ${isScrolled ? 'max-h-0 opacity-0 mt-0 pointer-events-none' : 'max-h-5 opacity-100'} ${isAct ? 'text-[#000000]' : 'text-[#8E8E93]'}`}>{label}</span>
+    </button>
+  );
+}
+
+function LoadingScreen() {
+  return <div className="h-screen flex flex-col items-center justify-center bg-[#F2F2F7]"><div className="w-10 h-10 border-4 border-[#E5E5EA] border-t-[#007AFF] rounded-full animate-spin mb-4" /><p className="text-[#8E8E93] font-[900]">고촌고 실시간 동기화 중...</p></div>;
+}
+
+function AuthModal({ db, appId, onClose, onAuth }) {
+  const [mode, setMode] = useState('login');
+  const [sid, setSid] = useState('');
+  const [pw, setPw] = useState('');
+  const [error, setError] = useState('');
+
+  const handleAction = async (e) => {
+    e.preventDefault(); setError('');
+    if (sid.length < 4) return setError("학번을 입력하세요.");
+    const profileRef = doc(db, 'artifacts', appId, 'public', 'data', 'profiles', sid);
+    try {
+      const snap = await getDoc(profileRef);
+      if (mode === 'login') {
+        if (snap.exists() && snap.data().pw === pw) onAuth({ id: sid, isAdmin: sid === '10800' || sid === 'admin', isGuest: false });
+        else setError("일치하는 정보가 없습니다.");
+      } else {
+        if (snap.exists()) setError("이미 등록된 학번입니다.");
+        else { await setDoc(profileRef, { pw, sid, at: Date.now() }); onAuth({ id: sid, isAdmin: sid === '10800' || sid === 'admin', isGuest: false }); }
+      }
+    } catch (e) { setError("권한 오류 발생"); }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-6 backdrop-blur-md">
+      <div className="one-panel w-full max-w-sm p-10 relative">
+        <button onClick={onClose} className="absolute top-6 right-6 text-gray-400"><Icons.X /></button>
+        <h2 className="text-[26px] font-[900] text-center mb-8">{mode === 'login' ? '연동하기' : '새 계정'}</h2>
+        <form onSubmit={handleAction} className="space-y-5">
+          <input type="text" placeholder="학번" value={sid} onChange={e=>setSid(e.target.value)} className="w-full one-input p-5" />
+          <input type="password" placeholder="비밀번호" value={pw} onChange={e=>setPw(e.target.value)} className="w-full one-input p-5" />
+          {error && <p className="text-[#FF3B30] text-[13px] font-[900] text-center">{error}</p>}
+          <button type="submit" className="btn-press w-full bg-[#007AFF] text-white py-5 rounded-[24px] font-[900]">확인</button>
+          <button type="button" onClick={()=>setMode(mode==='login'?'reg':'login')} className="w-full text-[14px] text-[#8E8E8E] font-[800] underline">{mode === 'login' ? '처음이신가요? 가입하기' : '이미 계정이 있나요? 로그인'}</button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function CustomModal({ isOpen, type, payload, onClose, onSubmit }) {
+  const [vals, setVals] = useState({});
+  useEffect(() => { if(isOpen) setVals(payload?.default || {}); }, [isOpen, payload]);
+  if (!isOpen) return null;
+
+  if (type === 'SETTINGS') {
+    return (
+      <div className="fixed inset-0 bg-black/40 z-[100] flex items-end justify-center backdrop-blur-sm">
+        <div className="bg-white w-full max-w-md p-8 rounded-t-[48px] shadow-2xl pb-12">
+          <div className="w-14 h-1.5 bg-[#E5E5EA] rounded-full mx-auto mb-8"></div>
+          <button onClick={()=>{localStorage.removeItem('duru_session_86'); window.location.reload();}} className="btn-press w-full bg-[#FF3B30]/10 p-6 rounded-[32px] text-[#FF3B30] font-[900] text-lg">로그아웃</button>
+          <button onClick={onClose} className="w-full py-5 mt-6 one-item font-[900]">닫기</button>
+        </div>
+      </div>
+    );
+  }
+
+  let title = "입력", inputs = [];
+  if (type === 'NOTICE') { title = "공지 추가"; inputs = [{k:'title', p:'제목'}, {k:'content', p:'내용'}]; }
+  if (type === 'PLAN_ADD') { title = "할 일 추가"; inputs = [{k:'text', p:'할 일'}]; }
+  if (type === 'SCHED') { title = "학사일정 추가"; inputs = [{k:'title', p:'일정명'}, {k:'date', type:'date', p:''}]; }
+  if (type === 'FILE') { title = "자료 보관"; inputs = [{k:'title', p:'제목'}, {k:'subject', p:'과목'}, {k:'link', p:'URL'}]; }
+  if (type === 'MEMO') { title = "수업 메모"; inputs = [{k:'content', p:'준비물/과제'}]; }
+
+  return (
+    <div className="fixed inset-0 bg-black/40 z-[100] flex items-end justify-center backdrop-blur-sm">
+      <div className="bg-white w-full max-w-md p-8 rounded-t-[48px] shadow-2xl pb-12">
+        <div className="w-14 h-1.5 bg-[#E5E5EA] rounded-full mx-auto mb-8"></div>
+        <h3 className="text-[22px] font-[900] mb-8 px-2">{title}</h3>
+        <form onSubmit={e => { e.preventDefault(); onSubmit(vals); }} className="space-y-5">
+          {inputs.map(i => <input key={i.k} type={i.type||'text'} placeholder={i.p} value={vals[i.k] || ''} onChange={e => setVals({...vals, [i.k]: e.target.value})} className="w-full one-input p-5 text-lg" />)}
+          <div className="flex gap-4 pt-6">
+            <button type="button" onClick={onClose} className="btn-press flex-1 py-5 one-item font-[900] text-lg">취소</button>
+            <button type="submit" className="btn-press flex-1 py-5 bg-[#007AFF] text-white rounded-[28px] font-[900] text-lg shadow-lg">저장</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// 탭 컴포넌트들
+function HomeTab({ data, apiData, dates, isAdmin, openModal, db, appId }) {
+  const meal = data.overrides.meals[dates.tdStr] || apiData.meals[dates.tdStr];
+  const nextEvt = data.schedules.filter(s => new Date(s.date) >= new Date(dates.tdStr))[0];
+
+  return (
+    <div className="space-y-8 animate-in fade-in duration-500">
+      <div className="one-panel p-8">
+        <div className="flex justify-between items-center mb-6"><h2 className="font-[900] text-[24px]">알림판</h2>{isAdmin && <button onClick={() => openModal('NOTICE')} className="btn-press w-10 h-10 one-item rounded-full flex items-center justify-center text-[#007AFF] shadow-sm"><Icons.Plus /></button>}</div>
+        <div className="space-y-4">{data.announcements.length > 0 ? data.announcements.slice(0,2).map(a => (
+          <div key={a.id} className="one-item p-6 relative shadow-sm border border-white"><h3 className="font-[900] text-[18px]">{a.title}</h3><p className="text-[15px] text-[#5C5C5C] mt-2 font-[600] leading-relaxed">{a.content}</p></div>
+        )) : <div className="p-4 text-center text-[#8E8E93] font-[600]">공지가 비어있습니다.</div>}</div>
+      </div>
+      <div className="one-panel p-8 text-center min-h-[160px] flex flex-col justify-center bg-gradient-to-br from-white to-[#F9FAFB]">
+        <p className="text-[14px] font-[900] text-[#8E8E93] mb-2 uppercase tracking-widest">다음 통합 일정</p>
+        <div className="font-[900] text-[22px] text-[#007AFF]">{nextEvt ? nextEvt.title : '등록된 일정 없음'}</div>
+        <p className="text-[14px] font-[800] mt-1.5 text-[#8E8E93]">{nextEvt?.date || ''}</p>
+      </div>
+      <div className="one-panel p-8">
+        <h3 className="font-[900] text-[22px] mb-6">오늘의 급식 🍱</h3>
+        <div className="one-item p-8 min-h-[140px] flex flex-wrap items-center justify-center text-center">
+          {meal?.DDISH_NM ? meal.DDISH_NM.split(/<br\/>/gi).map((m,i)=>(<div key={i} className="bg-white px-5 py-2.5 rounded-full text-[16px] font-[900] m-1.5 shadow-md border border-[#F2F2F7]">{m.replace(/\(.*?\)/g, '').replace(/[\d.]/g, '')}</div>)) : <span className="text-[#8E8E93] font-[600]">식단 정보가 없습니다.</span>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function TimeTab({ data, apiData, dates, openModal }) {
+  const [view, setView] = useState('today');
+  const dStr = view === 'today' ? dates.tdStr : dates.tmStr;
+  const list = data.overrides.time[dStr] ? data.overrides.time[dStr].map((s,i)=>({PERIO:i+1, ITRT_CNTNT:s})) : (apiData.timetable[dStr] || []);
+  const isWeekend = new Date(dStr).getDay() === 0 || new Date(dStr).getDay() === 6;
+
+  return (
+    <div className="space-y-8 animate-in slide-in-from-bottom-4 duration-500">
+      <div className="one-panel flex p-2"><button onClick={()=>setView('today')} className={`flex-1 py-4 rounded-[28px] font-[900] text-[15px] transition-all ${view==='today' ? 'bg-[#F2F2F7] shadow-inner text-black' : 'text-[#8E8E93]'}`}>오늘</button><button onClick={()=>setView('tomorrow')} className={`flex-1 py-4 rounded-[28px] font-[900] text-[15px] transition-all ${view==='tomorrow' ? 'bg-[#F2F2F7] shadow-inner text-black' : 'text-[#8E8E93]'}`}>내일</button></div>
+      <div className="space-y-4">{list.length > 0 ? list.map(t => (
+        <div key={t.PERIO} className="one-panel p-6 flex justify-between items-center transition-all hover:scale-[1.01]">
+          <div className="flex items-center gap-6"><span className="w-14 h-14 one-item flex items-center justify-center font-[900] text-[24px] text-[#007AFF] shadow-inner">{t.PERIO}</span><div><h4 className="font-[900] text-[20px]">{t.ITRT_CNTNT}</h4>{data.memos[`${dStr}_${t.PERIO}`] && <p className="text-[13px] text-[#007AFF] font-[900] mt-1.5 bg-[#E5F1FF] px-3 py-1 rounded-lg inline-block">💡 {data.memos[`${dStr}_${t.PERIO}`]}</p>}</div></div>
+          <button onClick={()=>openModal('MEMO', {id: `${dStr}_${t.PERIO}`, default:{content: data.memos[`${dStr}_${t.PERIO}`]}})} className="btn-press p-4 one-item rounded-full text-gray-400"><Icons.Plus/></button>
+        </div>
+      )) : <div className="py-24 text-center one-panel text-[#8E8E93] font-[900] text-lg">{isWeekend ? "행복한 주말 보내세요! 🛌" : "수업 정보를 찾을 수 없습니다."}</div>}</div>
+    </div>
+  );
+}
+
+function MealTab({ data, apiData, dates, isAdmin, openModal }) {
+  const Card = ({ dStr, title }) => {
+    const meal = data.overrides.meals[dStr] || apiData.meals[dStr];
+    return (
+      <div className="one-panel p-8 mb-8">
+        <div className="flex justify-between items-center mb-6"><h2 className="text-[22px] font-[900]">{title}</h2>{isAdmin && <button onClick={()=>openModal('EDIT_MEAL', {date: dStr, default:{menu: meal?.DDISH_NM}})} className="btn-press text-[14px] font-[900] text-[#007AFF] one-item px-4 py-2">수동 편집</button>}</div>
+        <div className="one-item p-8 min-h-[160px] flex flex-wrap gap-3 items-center justify-center">
+          {meal?.DDISH_NM ? meal.DDISH_NM.split(/<br\/>/gi).map((m,i)=>(<div key={i} className="bg-white border border-[#E5E5EA] px-5 py-3 rounded-full text-[17px] font-[900] shadow-sm">{m.replace(/\(.*?\)/g, '').replace(/[\d.]/g, '')}</div>)) : <span className="text-[#8E8E93] font-[900]">정보가 없습니다.</span>}
+        </div>
+        {meal && <p className="text-right mt-5 text-[14px] text-[#8E8E93] font-[900] tracking-wide">{meal.CAL_INFO}</p>}
+      </div>
+    );
+  };
+  return <div><Card dStr={dates.tdStr} title="오늘의 식단" /><Card dStr={dates.tmStr} title="내일의 식단" /></div>;
+}
+
+function ClassTab({ data, isAdmin, dates, openModal, db, appId, uid }) {
+  const [vDate, setVDate] = useState(dates.tdStr);
+  const tasks = data.planner.filter(p => p.date === vDate);
+
+  const toggleTask = async (t) => { await setDoc(doc(db, 'artifacts', appId, 'users', uid, 'planner', t.id), { done: !t.done }, { merge: true }); };
+  const delTask = async (id) => { await deleteDoc(doc(db, 'artifacts', appId, 'users', uid, 'planner', id)); };
+
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-10 pb-16">
+      <div className="space-y-6"><h2 className="text-[22px] font-[900] px-2 flex justify-between items-center">플래너 <button onClick={()=>openModal('PLAN_ADD', {date: vDate})} className="btn-press w-9 h-9 bg-[#007AFF] text-white rounded-full flex items-center justify-center shadow-md"><Icons.Plus /></button></h2>
+        <div className="one-panel p-6"><div className="one-item flex p-1 mb-6"><button onClick={()=>setVDate(dates.tdStr)} className={`flex-1 py-2.5 rounded-[20px] text-[14px] font-[900] ${vDate===dates.tdStr ? 'bg-white shadow-sm' : 'text-[#8E8E93]'}`}>오늘</button><button onClick={()=>setVDate(dates.tmStr)} className={`flex-1 py-2.5 rounded-[20px] text-[14px] font-[900] ${vDate===dates.tmStr ? 'bg-white shadow-sm' : 'text-[#8E8E93]'}`}>내일</button></div>
+          <div className="space-y-4">{tasks.length > 0 ? tasks.map(t => (
+            <div key={t.id} className="bg-white border border-[#E5E5EA] rounded-[24px] p-5 flex items-center justify-between shadow-sm transition-all active:scale-95"><button onClick={() => toggleTask(t)} className="flex items-center gap-4 flex-1 text-left"><div className={`w-8 h-8 rounded-full flex items-center justify-center border-2 transition-all ${t.done ? 'bg-[#007AFF] border-[#007AFF] text-white' : 'border-[#D1D1D6] text-transparent'}`}><Icons.Check /></div><span className={`font-[900] text-[17px] ${t.done ? 'line-through text-[#8E8E93]' : ''}`}>{t.text}</span></button><button onClick={() => delTask(t.id)} className="text-[#FF3B30] p-2"><Icons.X /></button></div>
+          )) : <div className="text-center py-10 text-[15px] font-[800] text-[#8E8E93] bg-[#F9FAFB] rounded-[24px]">할 일이 없습니다.</div>}</div></div></div>
+      <div className="space-y-6"><h2 className="text-[22px] font-[900] px-2 flex justify-between items-center">통합 일정 {isAdmin && <button onClick={()=>openModal('SCHED')} className="text-[#007AFF] text-[14px] font-[900] px-3 py-1 bg-white rounded-full shadow-sm">추가</button>}</h2><div className="grid gap-4">{data.schedules.length > 0 ? data.schedules.map(s => (<div key={s.id} className="one-panel p-6 flex justify-between items-center relative group transition-all hover:bg-[#F2F2F7] shadow-sm"><div className="flex-1"><h3 className="font-[900] text-[17px]">{s.title}</h3><p className="text-[13px] font-[800] text-[#8E8E93] mt-1 tracking-wide">{s.date}</p></div>{isAdmin && <button onClick={()=>deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'schedules', s.id))} className="text-[#FF3B30] p-2 opacity-0 group-hover:opacity-100"><Icons.X /></button>}</div>)) : <div className="text-center py-12 text-[#8E8E93] font-[900] one-panel">일정이 없습니다.</div>}</div></div>
+      <div className="space-y-6"><h2 className="text-[22px] font-[900] px-2 flex justify-between items-center">자료 보관함 {isAdmin && <button onClick={()=>openModal('FILE')} className="text-[#007AFF] text-[14px] font-[900] px-3 py-1 bg-white rounded-full shadow-sm">공유</button>}</h2><div className="grid gap-4">{data.materials.length > 0 ? data.materials.map(m => (<a key={m.id} href={m.link} target="_blank" className="one-panel p-6 flex items-center gap-5 transition-all active:scale-95 group relative shadow-sm hover:shadow-md"><div className="w-12 h-12 one-item flex items-center justify-center text-[#007AFF]"><Icons.Home/></div><div><h3 className="font-[900] text-[17px]">{m.title}</h3><span className="text-[12px] font-[900] text-[#8E8E93]">{m.subject}</span></div>{isAdmin && <button onClick={(e) => {e.preventDefault(); deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'materials', m.id))}} className="absolute top-4 right-4 text-[#FF3B30] opacity-0 group-hover:opacity-100"><Icons.X/></button>}</a>)) : <div className="text-center py-12 text-[#8E8E93] font-[900] one-panel">자료가 없습니다.</div>}</div></div>
+    </div>
+  );
+}
 
-        /* ==========================================
-           One UI Core Components (Flat & Rounded)
-           ========================================== */
-        
-        /* 1. 메인 패널 (거대한 코너 곡률, 깔끔한 그림자) */
-        .ui-panel {
-            background: var(--bg-panel);
-            border-radius: 32px;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03), 0 0 1px rgba(0, 0, 0, 0.05);
-            position: relative;
-            overflow: hidden;
-        }
-
-        /* 2. 내부 리스트/아이템 요소 (완전 플랫) */
-        .ui-item {
-            background: var(--bg-item);
-            border-radius: 24px;
-            transition: background 0.2s var(--spring);
-            border: none;
-        }
-
-        /* 3. 입력 필드 */
-        .ui-input {
-            background: var(--bg-item);
-            border-radius: 20px;
-            color: var(--text-main);
-            font-weight: 600;
-            border: 2px solid transparent;
-            transition: all 0.2s ease;
-        }
-        .ui-input:focus {
-            background: var(--bg-panel);
-            border-color: var(--accent);
-            outline: none;
-        }
-        .ui-input::placeholder { color: #A1A1A6; font-weight: 500; }
-
-        /* 4. 메인 버튼 (알약 형태) */
-        .ui-btn-primary {
-            background-color: var(--accent);
-            color: #FFFFFF;
-            border-radius: 100px;
-            font-weight: 700;
-            font-size: 16px;
-            border: none;
-            transition: all 0.3s var(--spring-bouncy);
-        }
-
-        /* 5. 서브 버튼 */
-        .ui-btn-secondary {
-            background-color: var(--bg-item);
-            color: var(--text-main);
-            border-radius: 100px;
-            font-weight: 700;
-            transition: all 0.3s var(--spring-bouncy);
-        }
-
-        /* 클릭 액션 (크기 축소) */
-        .btn-press { transition: transform 0.25s var(--spring-bouncy), opacity 0.2s; }
-        .btn-press:active { transform: scale(0.95) !important; opacity: 0.8; }
-
-        /* 헤더 */
-        .ui-header {
-            background: rgba(242, 242, 247, 0.85);
-            backdrop-filter: blur(20px);
-            -webkit-backdrop-filter: blur(20px);
-            z-index: 40;
-        }
-
-        /* ==========================================
-           One UI Bottom Navigation (알약 디자인)
-           ========================================== */
-        .ui-nav-wrapper {
-            position: fixed;
-            bottom: max(20px, env(safe-area-inset-bottom));
-            left: 50%;
-            transform: translateX(-50%);
-            z-index: 50;
-            display: flex;
-            justify-content: center;
-            width: calc(100% - 32px);
-            max-width: 420px; 
-            transition: all 0.5s var(--spring-bouncy);
-        }
-
-        .ui-nav {
-            background: rgba(255, 255, 255, 0.9);
-            backdrop-filter: blur(20px);
-            -webkit-backdrop-filter: blur(20px);
-            border-radius: 100px; /* 완전한 알약 */
-            box-shadow: 0 8px 32px rgba(0,0,0,0.06), 0 0 1px rgba(0,0,0,0.1);
-            padding: 8px; 
-            display: flex;
-            width: 100%;
-            height: 72px;
-            gap: 4px;
-            transition: all 0.5s var(--spring-bouncy);
-        }
-
-        /* 스크롤 시 작아지는 상태 */
-        .ui-nav-wrapper.shrunk { bottom: max(16px, env(safe-area-inset-bottom)); width: 200px; }
-        .ui-nav-wrapper.shrunk .ui-nav { height: 52px; padding: 4px; }
-        .ui-nav-wrapper.shrunk .nav-label { opacity: 0; transform: translateY(10px) scale(0.5); position: absolute; pointer-events: none; }
-        .ui-nav-wrapper.shrunk .nav-icon { transform: translateY(0) scale(0.9); }
-
-        /* ==========================================
-           One UI Bottom Sheet Modal
-           ========================================== */
-        .ui-sheet-overlay {
-            background-color: rgba(0, 0, 0, 0.4); 
-            backdrop-filter: blur(2px);
-            -webkit-backdrop-filter: blur(2px);
-        }
-        .ui-sheet {
-            background: var(--bg-panel);
-            border-radius: 40px 40px 0 0;
-            box-shadow: 0 -4px 24px rgba(0,0,0,0.08);
-        }
-        .ui-drag-indicator {
-            width: 40px; height: 5px;
-            background: #E5E5EA;
-            border-radius: 10px;
-            margin: 12px auto 24px auto;
-        }
-
-        /* 토글 스위치 디자인 */
-        .ui-toggle {
-            width: 52px; height: 32px;
-            border-radius: 100px;
-            padding: 2px;
-            transition: background-color 0.3s ease;
-        }
-        .ui-toggle-knob {
-            width: 28px; height: 28px;
-            background: white;
-            border-radius: 50%;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            transition: transform 0.4s var(--spring-bouncy);
-        }
-
-        /* 애니메이션 */
-        @keyframes fade-in { 0% { opacity: 0; transform: translateY(10px); } 100% { opacity: 1; transform: translateY(0); } }
-        .animate-fade { animation: fade-in 0.4s ease-out forwards; }
-        @keyframes toast-slide { 0% { transform: translateY(-40px); opacity: 0; } 100% { transform: translateY(0); opacity: 1; } }
-        .toast-enter { animation: toast-slide 0.4s var(--spring-bouncy) forwards; }
-    </style>
-</head>
-<body>
-    <div id="root"></div>
-
-    <script type="text/babel">
-        const { useState, useEffect } = React;
-
-        // Firebase 설정 (고정)
-        const firebaseConfig = {
-            apiKey: "AIzaSyAP8WRXAjmPdmATfWKnCrCRQNH0ftbBV9w",
-            authDomain: "duru108.firebaseapp.com",
-            projectId: "duru108",
-            storageBucket: "duru108.firebasestorage.app",
-            messagingSenderId: "669255987956",
-            appId: "1:669255987956:web:7479e73d084a2faafb24a1"
-        };
-
-        let isFirebaseReady = false;
-        try {
-            if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
-            isFirebaseReady = true;
-        } catch (e) { console.error("Firebase Init Error", e); }
-
-        const db = isFirebaseReady ? firebase.firestore() : null;
-        const auth = isFirebaseReady ? firebase.auth() : null;
-        const APP_ID = "duru-class-1-8";
-
-        // 깔끔한 SVG 아이콘 (선 굵기 조정)
-        const Icons = {
-            Home: () => <svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>,
-            Time: () => <svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>,
-            Meal: () => <svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>,
-            Class: () => <svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 002-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>,
-            Lock: () => <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><rect width="18" height="11" x="3" y="11" rx="3" ry="3"/><path strokeLinecap="round" strokeLinejoin="round" d="M7 11V7a5 5 0 0110 0v4"/></svg>,
-            Plus: () => <svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16M4 12h16"/></svg>,
-            Check: () => <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="3" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg>,
-            Settings: () => <svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>,
-            Users: () => <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/></svg>,
-            X: () => <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
-        };
-
-        function App() {
-            const [loading, setLoading] = useState(true);
-            const [isLogged, setIsLogged] = useState(false);
-            const [user, setUser] = useState(null);
-            const [activeTab, setActiveTab] = useState('home');
-            const [criticalDbError, setCriticalDbError] = useState(false);
-            const [isScrolledDown, setIsScrolledDown] = useState(false);
-
-            const [toast, setToast] = useState(null);
-            useEffect(() => {
-                if (toast) {
-                    const timer = setTimeout(() => setToast(null), 2500);
-                    return () => clearTimeout(timer);
-                }
-            }, [toast]);
-            const showToast = (msg, isError = false) => setToast({ id: Date.now(), msg, isError });
-
-            // 스크롤 반응형
-            useEffect(() => {
-                let lastScroll = window.scrollY;
-                const handleScroll = () => {
-                    const currentScroll = window.scrollY;
-                    if (currentScroll <= 0) { setIsScrolledDown(false); return; }
-                    if (currentScroll > lastScroll && currentScroll > 50) { setIsScrolledDown(true); } 
-                    else if (currentScroll < lastScroll) { setIsScrolledDown(false); }
-                    lastScroll = currentScroll;
-                };
-                window.addEventListener('scroll', handleScroll, { passive: true });
-                return () => window.removeEventListener('scroll', handleScroll);
-            }, []);
-
-            const [data, setData] = useState({ 
-                announcements: [], schedules: [], materials: [], 
-                cleaning: {}, memos: {}, planner: [], overrides: { meals: {}, time: {} }, allUsers: []
-            });
-            const [apiData, setApiData] = useState({ timetable: {}, meals: {} });
-            const [modal, setModal] = useState({ open: false, type: '', payload: {} });
-
-            const getDates = () => {
-                const td = new Date(); const tm = new Date(td); tm.setDate(td.getDate() + 1);
-                return {
-                    tdStr: td.toISOString().split('T')[0], tmStr: tm.toISOString().split('T')[0],
-                    tdNeis: td.toISOString().split('T')[0].replace(/-/g, ''), tmNeis: tm.toISOString().split('T')[0].replace(/-/g, ''),
-                    dayIdx: td.getDay()
-                };
-            };
-            const dates = getDates();
-
-            useEffect(() => {
-                if (!auth) return;
-                const savedSession = localStorage.getItem('duru_session');
-                if (savedSession) {
-                    setUser(JSON.parse(savedSession));
-                    setIsLogged(true);
-                }
-
-                const initAuth = async () => {
-                    try { 
-                        await auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
-                        await auth.signInAnonymously(); 
-                    } catch (e) { 
-                        if (e.code === 'auth/configuration-not-found') showToast("Firebase 익명 로그인을 활성화해주세요!", true);
-                    }
-                };
-                initAuth();
-                
-                const unsubscribe = auth.onAuthStateChanged((u) => { if (u) setLoading(false); });
-                return () => unsubscribe();
-            }, []);
-
-            useEffect(() => {
-                if (!isLogged || !user || !auth.currentUser) return;
-                
-                const base = (col) => db.collection('artifacts').doc(APP_ID).collection('public').doc('data').collection(col);
-                const plannerId = user.isGuest ? auth.currentUser.uid : user.id;
-                const privateBase = () => db.collection('artifacts').doc(APP_ID).collection('users').doc(plannerId).collection('planner');
-                
-                const errHandler = (e) => { if(e.code === 'permission-denied') setCriticalDbError(true); };
-                
-                const unsubs = [
-                    base('announcements').onSnapshot(s => setData(p => ({...p, announcements: s.docs.map(d=>({id:d.id, ...d.data()})).sort((a,b)=>b.at-a.at)})), errHandler),
-                    base('schedules').onSnapshot(s => setData(p => ({...p, schedules: s.docs.map(d=>({id:d.id, ...d.data()})).sort((a,b)=>new Date(a.date)-new Date(b.date))})), errHandler),
-                    base('materials').onSnapshot(s => setData(p => ({...p, materials: s.docs.map(d=>({id:d.id, ...d.data()})).sort((a,b)=>b.at-a.at)})), errHandler),
-                    base('cleaning').onSnapshot(s => { const o={}; s.docs.forEach(d=>o[d.id]=d.data().names); setData(p=>({...p, cleaning: o})); }, errHandler),
-                    base('memos').onSnapshot(s => { const o={}; s.docs.forEach(d=>o[d.id]=d.data().content); setData(p=>({...p, memos: o})); }, errHandler),
-                    base('override_meals').onSnapshot(s => { const o={}; s.docs.forEach(d=>o[d.id]=d.data()); setData(p=>({...p, overrides: {...p.overrides, meals: o}})); }, errHandler),
-                    base('override_time').onSnapshot(s => { const o={}; s.docs.forEach(d=>o[d.id]=d.data().periods); setData(p=>({...p, overrides: {...p.overrides, time: o}})); }, errHandler),
-                    privateBase().onSnapshot(s => { setData(p => ({...p, planner: s.docs.map(d=>({id:d.id, ...d.data()})).sort((a,b)=>b.at-a.at)})); }, errHandler)
-                ];
-                
-                if (user.isAdmin) unsubs.push(base('profiles').onSnapshot(s => setData(p => ({...p, allUsers: s.docs.map(d=>d.data()).sort((a,b)=>parseInt(a.sid)-parseInt(b.sid))})), errHandler));
-                return () => unsubs.forEach(fn => fn());
-            }, [isLogged, user]);
-
-            useEffect(() => {
-                const f = async () => {
-                    try {
-                        const [tR, mR] = await Promise.all([
-                            fetch(`https://open.neis.go.kr/hub/hisTimetable?Type=json&ATPT_OFCDC_SC_CODE=J10&SD_SCHUL_CODE=7531127&GRADE=1&CLASS_NM=8&ALL_TI_YMD=${dates.tdNeis}`),
-                            fetch(`https://open.neis.go.kr/hub/mealServiceDietInfo?Type=json&ATPT_OFCDC_SC_CODE=J10&SD_SCHUL_CODE=7531127&MLSV_FROM_YMD=${dates.tdNeis}&MLSV_TO_YMD=${dates.tmNeis}`)
-                        ]);
-                        const tD = await tR.json(); const mD = await mR.json();
-                        setApiData({
-                            timetable: { [dates.tdStr]: tD.hisTimetable ? tD.hisTimetable[1].row.sort((a,b)=>a.PERIO-b.PERIO) : [] },
-                            meals: {
-                                [dates.tdStr]: mD.mealServiceDietInfo ? mD.mealServiceDietInfo[1].row.find(r=>r.MLSV_YMD===dates.tdNeis) : null,
-                                [dates.tmStr]: mD.mealServiceDietInfo ? mD.mealServiceDietInfo[1].row.find(r=>r.MLSV_YMD===dates.tmNeis) : null
-                            }
-                        });
-                    } catch(e) {}
-                };
-                f();
-            }, []);
-
-            const handleModalSubmit = async (vals) => {
-                const { type, payload } = modal;
-                const base = (col) => db.collection('artifacts').doc(APP_ID).collection('public').doc('data').collection(col);
-                const plannerId = user.isGuest ? auth.currentUser.uid : user.id;
-
-                if (type === 'SETTINGS') {
-                    if (vals.type === 'CHANGE_PW_MODAL_OPEN') { setModal({ open: true, type: 'CHANGE_PW', payload: {} }); } 
-                    else if (vals.type === 'LOGOUT') {
-                        localStorage.removeItem('duru_session');
-                        setIsLogged(false); setUser(null);
-                        setModal({open: false, type: '', payload: {}});
-                        showToast("기기에서 로그아웃 되었습니다.");
-                    }
-                    return;
-                }
-
-                try {
-                    const safeDate = vals.date || dates.tdStr;
-                    if(type==='NOTICE') await base('announcements').add({title: vals.title||'', content: vals.content||'', at:Date.now()});
-                    if(type==='PLAN_ADD') await db.collection('artifacts').doc(APP_ID).collection('users').doc(plannerId).collection('planner').add({text: vals.text||'', done:false, date:payload.date||dates.tdStr, at:Date.now()});
-                    if(type==='SCHED') await base('schedules').add({title: vals.title||'', date: safeDate, isExam: !!vals.isExam, at:Date.now()});
-                    if(type==='FILE') await base('materials').add({title: vals.title||'', subject: vals.subject||'', link: vals.link||'', at:Date.now()});
-                    if(type==='EDIT_MEAL') {
-                        const ref = base('override_meals').doc(payload.date);
-                        if(vals.menu) await ref.set({DDISH_NM: vals.menu, CAL_INFO: vals.cal||''}); else await ref.delete();
-                    }
-                    if(type==='EDIT_TIME') {
-                        const ref = base('override_time').doc(payload.date);
-                        if(vals.periods) await ref.set({periods: vals.periods.split(',').map(s=>s.trim())}); else await ref.delete();
-                    }
-                    if(type==='EDIT_WEEK_TIME') {
-                        for(let i=1; i<=5; i++) {
-                            const ref = base('override_time').doc('day_'+i);
-                            if(vals['day'+i]) await ref.set({periods: vals['day'+i].split(',').map(s=>s.trim())}); else await ref.delete();
-                        }
-                    }
-                    if(type==='CLEAN') await base('cleaning').doc(String(vals.day)).set({names: vals.names||''});
-                    if(type==='MEMO') {
-                        const ref = base('memos').doc(payload.id);
-                        if(vals.content) await ref.set({content: vals.content, at:Date.now()}); else await ref.delete();
-                    }
-                    if(type==='CHANGE_PW') {
-                        const ref = base('profiles').doc(user.id);
-                        const docSnap = await ref.get();
-                        if(docSnap.data().pw === vals.oldPw) {
-                            await ref.update({pw: vals.newPw||''});
-                            showToast("비밀번호가 변경되었습니다.");
-                        } else {
-                            showToast("현재 비밀번호가 틀립니다.", true);
-                            return; 
-                        }
-                    }
-                    
-                    setModal({open: false, type: '', payload: {}});
-                    if(type !== 'CHANGE_PW') showToast("저장되었습니다.");
-
-                } catch(e) { 
-                    if(e.code === 'permission-denied') setCriticalDbError(true);
-                    else showToast("입력 오류. 양식을 확인하세요.", true);
-                }
-            };
-
-            if (criticalDbError) {
-                return (
-                    <div className="h-screen flex flex-col items-center justify-center p-6 text-left z-[200] fixed inset-0 overflow-y-auto" style={{backgroundColor: 'rgba(242,242,247,0.8)', backdropFilter: 'blur(20px)'}}>
-                        <div className="max-w-md w-full animate-fade p-8 text-center ui-panel">
-                            <div className="text-5xl mb-6">🔒</div>
-                            <h1 className="text-2xl font-bold text-[var(--danger)] mb-2 tracking-tight">접근이 차단되었습니다</h1>
-                            <p className="text-sm font-semibold text-[var(--text-muted)] mb-8">Firebase 데이터베이스 읽기 권한이 없습니다.</p>
-                            <button onClick={()=>window.location.reload()} className="btn-press ui-btn-primary w-full py-4">해결 후 새로고침</button>
-                        </div>
-                    </div>
-                );
-            }
-
-            if (loading) return <div className="h-screen flex items-center justify-center font-bold text-[var(--text-muted)] text-lg">로딩 중...</div>;
-            
-            return (
-                <div className="min-h-screen pb-[140px] relative">
-                    {/* 토스트 알림창 */}
-                    {toast && (
-                        <div className="fixed top-20 left-0 w-full z-[110] flex justify-center pointer-events-none px-4">
-                            <div key={toast.id} className={`toast-enter max-w-sm w-full p-4 rounded-[20px] font-bold text-center bg-[#FFFFFF] shadow-[0_8px_30px_rgba(0,0,0,0.12)] border border-[rgba(0,0,0,0.05)] ${toast.isError ? 'text-[var(--danger)]' : 'text-black'}`}>
-                                {toast.msg}
-                            </div>
-                        </div>
-                    )}
-
-                    {!isLogged ? (
-                        <LoginScreen db={db} appId={APP_ID} onLogin={(u) => { 
-                            setUser(u); setIsLogged(true); 
-                            if (!u.isGuest) localStorage.setItem('duru_session', JSON.stringify(u)); 
-                        }} showToast={showToast} setCriticalDbError={setCriticalDbError} />
-                    ) : (
-                        <>
-                            {modal.open && <Modal type={modal.type} payload={modal.payload} data={data} onClose={()=>setModal({open:false})} onSubmit={handleModalSubmit} user={user} />}
-                            
-                            {/* 헤더 */}
-                            <header className="sticky top-0 px-6 pt-14 pb-4 flex items-center justify-between ui-header">
-                                <div>
-                                    <h1 className="text-[28px] font-[800] tracking-tight text-[var(--text-main)] leading-none">Duru</h1>
-                                </div>
-                                <div className="flex items-center gap-3">
-                                    <div className="text-right">
-                                        <p className="text-[14px] font-bold text-[var(--text-main)] leading-tight">{user.id}</p>
-                                        <p className="text-[11px] font-semibold text-[var(--text-muted)] tracking-wide">{user.isAdmin ? 'Admin' : (user.isGuest ? 'Guest' : 'Student')}</p>
-                                    </div>
-                                    <button onClick={()=>setModal({open:true, type:'SETTINGS'})} className="btn-press p-2 text-[var(--text-main)]"><Icons.Settings/></button>
-                                </div>
-                            </header>
-
-                            <main className="max-w-xl mx-auto p-6 space-y-6 relative z-10">
-                                {activeTab === 'home' && <HomeTab data={data} apiData={apiData} dates={dates} isAdmin={user.isAdmin} openModal={(t,p)=>setModal({open:true, type:t, payload:p})} db={db} appId={APP_ID} showToast={showToast} setCriticalDbError={setCriticalDbError} />}
-                                {activeTab === 'time' && <TimeTab data={data} apiData={apiData} dates={dates} isAdmin={user.isAdmin} openModal={(t,p)=>setModal({open:true, type:t, payload:p})} />}
-                                {activeTab === 'meal' && <MealTab data={data} apiData={apiData} dates={dates} isAdmin={user.isAdmin} openModal={(t,p)=>setModal({open:true, type:t, payload:p})} />}
-                                {activeTab === 'class' && <ClassTab data={data} isAdmin={user.isAdmin} openModal={(t,p)=>setModal({open:true, type:t, payload:p})} db={db} appId={APP_ID} showToast={showToast} uid={user.isGuest ? auth.currentUser.uid : user.id} setCriticalDbError={setCriticalDbError} />}
-                            </main>
-
-                            {/* One UI Bottom Navigation (사진 4 갤러리 앱 참조) */}
-                            <div className={`ui-nav-wrapper ${isScrolledDown ? 'shrunk' : ''}`}>
-                                <nav className="ui-nav">
-                                    <NavBtn id="home" active={activeTab} set={setActiveTab} icon={Icons.Home} label="홈" />
-                                    <NavBtn id="time" active={activeTab} set={setActiveTab} icon={Icons.Time} label="시간표" />
-                                    <NavBtn id="meal" active={activeTab} set={setActiveTab} icon={Icons.Meal} label="급식" />
-                                    <NavBtn id="class" active={activeTab} set={setActiveTab} icon={Icons.Class} label="학급" />
-                                </nav>
-                            </div>
-                        </>
-                    )}
-                </div>
-            );
-        }
-
-        // ==========================================
-        // 로그인 랜딩 (One UI 플랫 디자인)
-        // ==========================================
-        function LoginScreen({ db, appId, onLogin, showToast, setCriticalDbError }) {
-            const [sid, setSid] = useState(''); const [pw, setPw] = useState('');
-            const [err, setErr] = useState(''); const [needsReg, setNeedsReg] = useState(false);
-            const [loading, setLoading] = useState(false);
-
-            const handleLogin = async (e) => {
-                e.preventDefault(); setErr('');
-                const idNum = parseInt(sid);
-                if(!sid || idNum < 10800 || idNum > 10834) return setErr("학번은 10800 ~ 10834 입니다.");
-                if(!pw) return setErr("비밀번호를 입력하세요.");
-                
-                setLoading(true);
-                try {
-                    const snap = await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('profiles').doc(sid).get();
-                    if(snap.exists) {
-                        if(snap.data().pw === pw) {
-                            onLogin({id: sid, isAdmin: sid==='10800', isGuest: false});
-                        } else setErr("비밀번호가 일치하지 않습니다.");
-                    } else setNeedsReg(true);
-                } catch(e) { 
-                    if(e.code === 'permission-denied') setCriticalDbError(true);
-                    else setErr("네트워크 오류가 발생했습니다.");
-                }
-                setLoading(false);
-            };
-
-            const handleReg = async () => {
-                setLoading(true);
-                try {
-                    await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('profiles').doc(sid).set({pw, sid, isAdmin: sid==='10800', at:Date.now()});
-                    onLogin({id: sid, isAdmin: sid==='10800', isGuest: false});
-                    showToast("가입 완료!");
-                } catch(e) { 
-                    if(e.code === 'permission-denied') setCriticalDbError(true);
-                    else setErr("가입 오류 발생"); 
-                }
-                setLoading(false);
-            };
-
-            return (
-                <div className="min-h-screen flex flex-col items-center justify-center p-6 animate-fade">
-                    <div className="w-full max-w-sm ui-panel p-8 pb-10">
-                        <div className="mb-10 mt-4 text-center">
-                            <h2 className="text-[32px] font-[800] tracking-tight text-[var(--text-main)]">로그인</h2>
-                            <p className="text-[15px] text-[var(--text-muted)] font-medium mt-1">Duru 프리미엄 포털</p>
-                        </div>
-
-                        <form onSubmit={handleLogin} className="space-y-4">
-                            <div className="space-y-3">
-                                <input type="number" placeholder="학번 (예: 10801)" value={sid} onChange={e=>{setSid(e.target.value); setNeedsReg(false);}} className="w-full ui-input p-5 text-[16px]" />
-                                <input type="password" placeholder="비밀번호" value={pw} onChange={e=>{setPw(e.target.value); setNeedsReg(false);}} className="w-full ui-input p-5 text-[16px]" />
-                            </div>
-                            
-                            {err && <div className="text-[var(--danger)] font-bold text-[14px] px-2">{err}</div>}
-                            
-                            {needsReg ? (
-                                <div className="ui-item p-5 text-center mt-2">
-                                    <p className="font-bold text-[14px] mb-4 text-[var(--text-main)]">미등록 학번입니다.<br/>이 암호로 기기를 등록할까요?</p>
-                                    <div className="flex gap-3">
-                                        <button type="button" onClick={()=>setNeedsReg(false)} className="btn-press flex-1 py-3.5 ui-btn-secondary text-[15px]">취소</button>
-                                        <button type="button" onClick={handleReg} className="btn-press flex-1 py-3.5 ui-btn-primary text-[15px]">기기 등록</button>
-                                    </div>
-                                </div>
-                            ) : (
-                                <div className="space-y-3 pt-4">
-                                    <button type="submit" className="btn-press w-full ui-btn-primary py-4">{loading ? '확인 중...' : '로그인'}</button>
-                                    <button type="button" onClick={() => {
-                                        onLogin({id: '손님', isAdmin: false, isGuest: true});
-                                        showToast("둘러보기 모드로 접속했습니다.");
-                                    }} className="btn-press w-full bg-transparent py-3 font-bold text-[15px] text-[var(--text-muted)]">
-                                        둘러보기
-                                    </button>
-                                </div>
-                            )}
-                        </form>
-                    </div>
-                </div>
-            );
-        }
-
-        // ==========================================
-        // 탭 콘텐츠 UI (거대한 코너 곡률, 큼직한 폰트)
-        // ==========================================
-        function HomeTab({ data, apiData, dates, isAdmin, openModal, db, appId, showToast, setCriticalDbError }) {
-            const duty = (dates.dayIdx > 0 && dates.dayIdx < 6) ? (data.cleaning[dates.dayIdx] || '미지정') : '휴식';
-            const meal = data.overrides.meals[dates.tdStr] || apiData.meals[dates.tdStr];
-            
-            const todayStr = new Date().toISOString().split('T')[0];
-            const nextExams = data.schedules.filter(s => s.isExam && new Date(s.date) >= new Date(todayStr));
-            const closestExam = nextExams.length > 0 ? nextExams[0] : null;
-            let examDiff = -1;
-            if (closestExam) {
-                const targetDate = new Date(closestExam.date);
-                if (!isNaN(targetDate)) examDiff = Math.ceil((targetDate - new Date(todayStr)) / (1000*60*60*24));
-            }
-
-            const deleteDoc = async (col, id) => {
-                try {
-                    await db.collection('artifacts').doc(appId).collection('public').doc('data').collection(col).doc(id).delete();
-                } catch(e) { if(e.code === 'permission-denied') setCriticalDbError(true); }
-            };
-
-            return (
-                <div className="space-y-5 animate-fade pb-6">
-                    {/* D-Day 위젯 (깔끔한 다크 패널) */}
-                    {closestExam && examDiff >= 0 && (
-                        <div className="ui-panel p-6 flex justify-between items-center bg-[#212121] text-white shadow-none">
-                            <div>
-                                <p className="text-[13px] font-bold mb-1 text-[var(--danger)]">다가오는 평가</p>
-                                <h2 className="text-[26px] font-[800] tracking-tight">{closestExam.title}</h2>
-                            </div>
-                            <div className="bg-[#3A3A3C] px-5 py-2.5 rounded-[20px] font-[800] text-[22px]">
-                                {examDiff === 0 ? 'D-Day' : `D-${examDiff}`}
-                            </div>
-                        </div>
-                    )}
-
-                    <div className="ui-panel p-6">
-                        <div className="flex justify-between items-center mb-5">
-                            <h2 className="font-[800] text-[20px] tracking-tight">알림판</h2>
-                            {isAdmin && <button onClick={()=>openModal('NOTICE')} className="btn-press text-[var(--accent)]"><Icons.Plus/></button>}
-                        </div>
-                        <div className="space-y-3">
-                            {data.announcements.slice(0,2).map(a => (
-                                <div key={a.id} className="ui-item p-5 relative">
-                                    <h3 className="font-bold text-[17px] mb-1">{a.title}</h3>
-                                    <p className="text-[15px] text-[var(--text-muted)] font-medium leading-relaxed">{a.content}</p>
-                                    {isAdmin && <button onClick={()=>deleteDoc('announcements', a.id)} className="btn-press absolute top-4 right-4 text-[12px] text-[var(--danger)] font-bold bg-white px-3 py-1.5 rounded-full shadow-sm">삭제</button>}
-                                </div>
-                            ))}
-                            {data.announcements.length === 0 && <p className="text-[15px] text-[var(--text-muted)] text-center py-6 font-semibold">새로운 공지가 없습니다.</p>}
-                        </div>
-                    </div>
-                    
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="ui-panel p-6 flex flex-col justify-center">
-                            <p className="text-[13px] font-bold text-[var(--text-muted)] mb-1">청소 구역</p>
-                            <div className="font-[800] text-[22px] text-[var(--text-main)] mb-1">{duty}</div>
-                            {isAdmin && <button onClick={()=>openModal('CLEAN', {default:{day:dates.dayIdx}})} className="btn-press text-[12px] text-[var(--accent)] font-bold text-left w-fit mt-1">수정</button>}
-                        </div>
-                        <div className="ui-panel p-6 flex flex-col justify-center">
-                            <p className="text-[13px] font-bold text-[var(--text-muted)] mb-1">다음 일정</p>
-                            <div className="font-[800] text-[18px] text-[var(--text-main)] truncate">{data.schedules[0]?.title || '일정 없음'}</div>
-                        </div>
-                    </div>
-                    
-                    <div className="ui-panel p-6">
-                        <div className="flex justify-between items-center mb-5">
-                            <h3 className="font-[800] text-[20px] tracking-tight">오늘의 식단</h3>
-                            {isAdmin && <button onClick={()=>openModal('EDIT_MEAL', {date:dates.tdStr, default:{menu:meal?.DDISH_NM, cal:meal?.CAL_INFO}})} className="btn-press text-[13px] text-[var(--accent)] font-bold bg-[#E5F1FF] px-3 py-1.5 rounded-full">편집</button>}
-                        </div>
-                        <div className="ui-item p-6 text-[17px] font-bold leading-relaxed min-h-[120px] flex items-center justify-center text-center">
-                            {meal?.DDISH_NM ? meal.DDISH_NM.replace(/<br\/>/gi, '\n') : <span className="text-[var(--text-muted)]">급식 정보가 없습니다.</span>}
-                        </div>
-                    </div>
-                </div>
-            );
-        }
-
-        function TimeTab({ data, apiData, dates, isAdmin, openModal }) {
-            const [view, setView] = useState('today');
-            const targetStr = view === 'today' ? dates.tdStr : dates.tmStr;
-            const targetDay = new Date(targetStr).getDay();
-            
-            let list = []; let type = '자동 연동됨';
-            if (data.overrides.time[targetStr]) { list = data.overrides.time[targetStr].map((s,i)=>({PERIO:String(i+1), ITRT_CNTNT:s})); type='수동 설정됨'; }
-            else if (data.overrides.time['day_'+targetDay]) { list = data.overrides.time['day_'+targetDay].map((s,i)=>({PERIO:String(i+1), ITRT_CNTNT:s})); type='주간 설정됨'; }
-            else { list = apiData.timetable[targetStr] || []; }
-
-            const wDefs = {}; [1,2,3,4,5].forEach(i => { if(data.overrides.time['day_'+i]) wDefs['day'+i] = data.overrides.time['day_'+i].join(','); });
-
-            return (
-                <div className="space-y-5 animate-fade pb-6">
-                    {/* One UI Toggle Switch */}
-                    <div className="relative flex h-[48px] p-1 items-center rounded-full bg-[var(--bg-panel)] shadow-sm">
-                        <div className="absolute top-1 bottom-1 ui-item spring-fluid border-none" style={{ left: `calc(${view === 'today' ? 0 : 50}% + 4px)`, width: `calc(50% - 8px)` }}></div>
-                        <button onClick={()=>setView('today')} className={`btn-press relative z-10 flex-1 h-full text-[15px] font-bold transition-colors duration-300 ${view==='today'?'text-[var(--text-main)]':'text-[var(--text-muted)]'}`}>오늘</button>
-                        <button onClick={()=>setView('tomorrow')} className={`btn-press relative z-10 flex-1 h-full text-[15px] font-bold transition-colors duration-300 ${view==='tomorrow'?'text-[var(--text-main)]':'text-[var(--text-muted)]'}`}>내일</button>
-                    </div>
-
-                    <div className="flex justify-between items-end px-2 pt-2">
-                        <h2 className="text-[32px] font-[800] tracking-tight">시간표</h2>
-                        <span className="text-[13px] font-bold text-[var(--text-muted)] bg-[var(--bg-panel)] px-3 py-1.5 rounded-full">{type}</span>
-                    </div>
-
-                    {isAdmin && (
-                        <div className="flex gap-3 px-1 mt-2">
-                            <button onClick={()=>openModal('EDIT_WEEK_TIME', {default:wDefs})} className="btn-press flex-1 ui-btn-secondary py-3 text-[14px]">전체 설정</button>
-                            <button onClick={()=>openModal('EDIT_TIME', {date:targetStr, default:{periods:list.map(l=>l.ITRT_CNTNT).join(',')}})} className="btn-press flex-1 ui-btn-secondary py-3 text-[14px]">개별 수정</button>
-                        </div>
-                    )}
-
-                    <div className="space-y-3 pt-2">
-                        {list.length > 0 ? list.map(t => (
-                            <div key={t.PERIO} className="ui-panel p-5 flex justify-between items-center">
-                                <div className="flex items-center gap-5">
-                                    <span className="w-[52px] h-[52px] bg-[#E5F1FF] rounded-[20px] flex items-center justify-center font-[800] text-[22px] text-[var(--accent)]">{t.PERIO}</span>
-                                    <div>
-                                        <h4 className="font-[800] text-[20px]">{t.ITRT_CNTNT}</h4>
-                                        {data.memos[`${targetStr}_${t.PERIO}`] && <p className="text-[13px] text-[var(--text-muted)] font-semibold mt-1">💡 {data.memos[`${targetStr}_${t.PERIO}`]}</p>}
-                                    </div>
-                                </div>
-                                <button onClick={()=>openModal('MEMO', {id:`${targetStr}_${t.PERIO}`, default:{content:data.memos[`${targetStr}_${t.PERIO}`]}})} className="btn-press p-3 text-[var(--text-muted)] bg-[var(--bg-item)] rounded-full"><Icons.Time/></button>
-                            </div>
-                        )) : <div className="py-20 text-center text-[var(--text-muted)] ui-panel font-bold text-[16px]">수업 정보가 없습니다.</div>}
-                    </div>
-                </div>
-            );
-        }
-
-        function MealTab({ data, apiData, isAdmin, dates, openModal }) {
-            const MealCard = ({ dStr, title }) => {
-                const meal = data.overrides.meals[dStr] || apiData.meals[dStr];
-                return (
-                    <div className="ui-panel p-6">
-                        <div className="flex justify-between items-center mb-5">
-                            <h2 className="text-[22px] font-[800] tracking-tight">{title}</h2>
-                            {isAdmin && <button onClick={()=>openModal('EDIT_MEAL', {date:dStr, default:{menu:meal?.DDISH_NM, cal:meal?.CAL_INFO}})} className="btn-press text-[13px] text-[var(--accent)] font-bold bg-[#E5F1FF] px-3 py-1.5 rounded-full">편집</button>}
-                        </div>
-                        <div className="ui-item p-6 text-[17px] font-bold leading-relaxed min-h-[140px] flex items-center justify-center text-center">
-                            {meal?.DDISH_NM ? meal.DDISH_NM.replace(/<br\/>/gi, '\n') : <span className="text-[var(--text-muted)]">식단 정보가 없습니다.</span>}
-                        </div>
-                        {meal && <p className="text-right mt-3 font-bold text-[13px] text-[var(--text-muted)] tracking-wide">{meal.CAL_INFO}</p>}
-                    </div>
-                );
-            };
-            return (
-                <div className="space-y-6 animate-fade pb-6">
-                    <MealCard dStr={dates.tdStr} title="오늘의 급식" />
-                    <MealCard dStr={dates.tmStr} title="내일의 급식" />
-                </div>
-            );
-        }
-
-        function ClassTab({ data, isAdmin, openModal, db, appId, showToast, uid, setCriticalDbError }) {
-            const [viewDate, setViewDate] = useState(new Date().toISOString().split('T')[0]);
-            const tasks = data.planner.filter(p => p.date === viewDate);
-            const tmStr = new Date(new Date().getTime() + 86400000).toISOString().split('T')[0];
-            const todayStr = new Date().toISOString().split('T')[0];
-
-            const togglePlan = async (t) => {
-                try { await db.collection('artifacts').doc(appId).collection('users').doc(uid).collection('planner').doc(t.id).set({done:!t.done}, {merge:true}); }
-                catch(e) { if(e.code === 'permission-denied') setCriticalDbError(true); }
-            };
-
-            const delDoc = async (col, id, isPrivate=false) => {
-                try {
-                    const path = isPrivate ? db.collection('artifacts').doc(appId).collection('users').doc(uid).collection(col) 
-                                           : db.collection('artifacts').doc(appId).collection('public').doc('data').collection(col);
-                    await path.doc(id).delete();
-                } catch(e) { if(e.code === 'permission-denied') setCriticalDbError(true); }
-            }
-
-            return (
-                <div className="space-y-6 pb-6 animate-fade">
-                    <div className="ui-panel p-6">
-                        <div className="flex justify-between items-center mb-5">
-                            <h2 className="text-[22px] font-[800] tracking-tight">내 플래너</h2>
-                            <button onClick={()=>openModal('PLAN_ADD', {date:viewDate})} className="btn-press ui-btn-primary w-10 h-10 rounded-full flex justify-center items-center"><Icons.Plus/></button>
-                        </div>
-                        
-                        <div className="relative flex h-[48px] p-1 items-center mb-5 rounded-full ui-item">
-                            <div className="absolute top-1 bottom-1 bg-white rounded-full shadow-sm spring-fluid" style={{ left: `calc(${viewDate === tmStr ? 50 : 0}% + 4px)`, width: `calc(50% - 8px)` }}></div>
-                            <button onClick={()=>setViewDate(new Date().toISOString().split('T')[0])} className={`btn-press relative z-10 flex-1 h-full text-[15px] font-bold transition-colors duration-300 ${viewDate!==tmStr?'text-[var(--text-main)]':'text-[var(--text-muted)]'}`}>오늘</button>
-                            <button onClick={()=>setViewDate(tmStr)} className={`btn-press relative z-10 flex-1 h-full text-[15px] font-bold transition-colors duration-300 ${viewDate===tmStr?'text-[var(--text-main)]':'text-[var(--text-muted)]'}`}>내일</button>
-                        </div>
-
-                        <div className="space-y-3">
-                            {tasks.length > 0 ? tasks.map(t => (
-                                <div key={t.id} className="ui-item p-4 flex justify-between items-center bg-white border border-[rgba(0,0,0,0.05)]">
-                                    <button onClick={()=>togglePlan(t)} className="btn-press flex items-center gap-4 flex-1 text-left">
-                                        <div className={`w-7 h-7 rounded-full flex items-center justify-center transition-all duration-300 ${t.done?'bg-[var(--accent)] text-white':'border-[2.5px] border-[var(--text-muted)] text-transparent'}`}><Icons.Check/></div>
-                                        <span className={`font-bold text-[17px] transition-all duration-300 ${t.done?'text-[var(--text-muted)] line-through':'text-[var(--text-main)]'}`}>{t.text}</span>
-                                    </button>
-                                    <button onClick={()=>delDoc('planner', t.id, true)} className="btn-press px-4 py-2 text-[12px] text-[var(--danger)] font-bold bg-[rgba(255,59,48,0.1)] rounded-full ml-2">삭제</button>
-                                </div>
-                            )) : <div className="text-center py-10 text-[var(--text-muted)] text-[15px] font-bold ui-item">할 일을 추가해보세요.</div>}
-                        </div>
-                    </div>
-
-                    <div className="ui-panel p-6">
-                        <div className="flex justify-between items-center mb-5">
-                            <h2 className="text-[22px] font-[800] tracking-tight">학사 일정</h2>
-                            {isAdmin && <button onClick={()=>openModal('SCHED')} className="btn-press text-[13px] text-[var(--accent)] font-bold bg-[#E5F1FF] px-4 py-2 rounded-full">일정 추가</button>}
-                        </div>
-                        <div className="space-y-3">
-                            {data.schedules.map(s => {
-                                const tDate = new Date(s.date);
-                                let diff = '설정안됨';
-                                if (!isNaN(tDate)) diff = Math.ceil((tDate - new Date(todayStr)) / (1000*60*60*24));
-                                
-                                return (
-                                    <div key={s.id} className="ui-item p-5 flex justify-between items-center relative">
-                                        <div>
-                                            <h3 className={`font-bold text-[18px] mb-1 ${s.isExam ? 'text-[var(--danger)]' : 'text-[var(--text-main)]'}`}>{s.title}</h3>
-                                            <div className="flex items-center gap-2">
-                                                {s.isExam && <span className="bg-[rgba(255,59,48,0.1)] px-2 py-0.5 rounded-md text-[11px] font-bold text-[var(--danger)]">중요</span>}
-                                                <p className="text-[13px] font-bold text-[var(--text-muted)]">{s.date}</p>
-                                            </div>
-                                        </div>
-                                        <div className={`px-4 py-2 font-[800] text-[15px] rounded-xl ${s.isExam ? 'bg-[var(--danger)] text-white' : 'bg-white text-[var(--text-main)] shadow-sm'}`}>
-                                            {diff === '설정안됨' ? '-' : (diff===0?'D-Day':(diff>0?`D-${diff}`:'종료'))}
-                                        </div>
-                                        {isAdmin && <button onClick={()=>delDoc('schedules', s.id)} className="btn-press absolute -top-2 -right-2 text-[var(--text-muted)] w-8 h-8 rounded-full flex items-center justify-center font-bold bg-white shadow-sm border border-gray-100"><Icons.X/></button>}
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    </div>
-                    
-                    <div className="ui-panel p-6">
-                        <div className="flex justify-between items-center mb-5">
-                            <h2 className="text-[22px] font-[800] tracking-tight">자료 보관함</h2>
-                            {isAdmin && <button onClick={()=>openModal('FILE')} className="btn-press text-[13px] text-[var(--accent)] font-bold bg-[#E5F1FF] px-4 py-2 rounded-full">자료 등록</button>}
-                        </div>
-                        <div className="space-y-3">
-                            {data.materials.map(m => (
-                                <a key={m.id} href={m.link} target="_blank" className="btn-press ui-item p-4 flex justify-between items-center text-left relative block">
-                                    <div className="flex gap-4 items-center">
-                                        <div className="bg-white p-3 rounded-2xl text-[var(--accent)] shadow-sm"><Icons.Class/></div>
-                                        <div>
-                                            <h3 className="font-bold text-[16px] mb-1 text-[var(--text-main)]">{m.title}</h3>
-                                            <span className="text-[12px] font-bold text-[var(--text-muted)] bg-[var(--bg-body)] px-2.5 py-1 rounded-lg">{m.subject||'공통 자료'}</span>
-                                        </div>
-                                    </div>
-                                    {isAdmin && <button onClick={(e)=>{e.preventDefault(); delDoc('materials', m.id);}} className="btn-press absolute top-3 right-3 text-[var(--danger)] bg-white px-3 py-1.5 rounded-full text-[11px] font-bold shadow-sm">삭제</button>}
-                                </a>
-                            ))}
-                        </div>
-                    </div>
-                </div>
-            );
-        }
-
-        // ==========================================
-        // 모달 (One UI Bottom Sheet) 
-        // ==========================================
-        function Modal({ type, payload, data, onClose, onSubmit, user }) {
-            const [vals, setVals] = useState(payload?.default || {});
-            const [viewUsers, setViewUsers] = useState(false);
-
-            let title = "입력", inputs = [];
-            if(type==='NOTICE'){ title="공지 작성"; inputs=[{k:'title', p:'제목'}, {k:'content', p:'내용'}]; }
-            if(type==='PLAN_ADD'){ title="할 일 추가"; inputs=[{k:'text', p:'할 일 내용'}]; }
-            if(type==='EDIT_TIME'){ title="시간표 1일 수정"; inputs=[{k:'periods', p:'쉼표로 구분 (국어,수학...)'}]; }
-            if(type==='EDIT_WEEK_TIME'){ title="주간 시간표 일괄 설정"; inputs=[1,2,3,4,5].map(i=>({k:'day'+i, p:['월','화','수','목','금'][i-1]+'요일 (쉼표구분)'})); }
-            if(type==='EDIT_MEAL'){ title="식단 수동 입력"; inputs=[{k:'menu', p:'메뉴'}, {k:'cal', p:'칼로리 (선택)'}]; }
-            if(type==='CLEAN'){ title="청소 당번 배정"; inputs=[{k:'day', p:'요일 번호(1~5)', type:'number'}, {k:'names', p:'이름'}]; }
-            if(type==='SCHED'){ title="일정 등록"; inputs=[{k:'title', p:'일정명'}, {k:'date', p:'', type:'date'}]; }
-            if(type==='FILE'){ title="자료 등록"; inputs=[{k:'title', p:'자료명'}, {k:'subject', p:'과목'}, {k:'link', p:'URL 링크'}]; }
-            if(type==='MEMO'){ title="시간표 메모"; inputs=[{k:'content', p:'준비물 등'}]; }
-            if(type==='CHANGE_PW'){ title="비밀번호 변경"; inputs=[{k:'oldPw', p:'현재 비밀번호', type:'password'}, {k:'newPw', p:'새 비밀번호', type:'password'}]; }
-
-            const [isVisible, setIsVisible] = useState(false);
-            useEffect(() => { setIsVisible(true); }, []);
-            
-            const handleClose = () => {
-                setIsVisible(false);
-                setTimeout(onClose, 300); 
-            };
-
-            const modalClasses = `fixed inset-0 z-[100] flex items-end justify-center transition-all duration-300 ${isVisible ? 'ui-sheet-overlay opacity-100' : 'opacity-0'}`;
-            const sheetClasses = `ui-sheet w-full max-w-md p-6 pb-12 relative transition-transform duration-400 var(--spring-bouncy) ${isVisible ? 'translate-y-0' : 'translate-y-full'}`;
-
-            if (type === 'SETTINGS') {
-                return (
-                    <div className={modalClasses}>
-                        <div className="absolute inset-0" onClick={handleClose}></div>
-                        <div className={sheetClasses}>
-                            <div className="ui-drag-indicator"></div>
-                            
-                            <div className="flex justify-between items-center mb-8 px-1">
-                                <h3 className="text-[24px] font-[800] tracking-tight">설정</h3>
-                                <button onClick={handleClose} className="btn-press ui-item p-2.5 rounded-full text-[var(--text-muted)]"><Icons.X/></button>
-                            </div>
-                            
-                            {!viewUsers ? (
-                                <div className="space-y-3">
-                                    {user?.isGuest ? (
-                                        <button onClick={()=>onSubmit({type:'LOGOUT'})} className="btn-press w-full ui-btn-primary p-5 flex items-center gap-4 text-left">
-                                            <div className="bg-white/20 text-white p-3 rounded-full"><Icons.Lock/></div>
-                                            <div><h4 className="font-bold text-[17px] text-white">학번으로 로그인</h4><p className="text-[13px] text-white/80 font-medium">기존 계정으로 접속합니다.</p></div>
-                                        </button>
-                                    ) : (
-                                        <>
-                                            <button onClick={()=>onSubmit({type:'CHANGE_PW_MODAL_OPEN'})} className="btn-press w-full ui-item p-5 flex items-center gap-4 text-left">
-                                                <div className="bg-white p-3 rounded-full text-[var(--accent)] shadow-sm"><Icons.Lock/></div>
-                                                <div><h4 className="font-bold text-[17px] text-[var(--text-main)]">비밀번호 변경</h4><p className="text-[13px] text-[var(--text-muted)] font-medium">내 계정의 암호를 바꿉니다.</p></div>
-                                            </button>
-                                            {data.allUsers && data.allUsers.length > 0 && (
-                                                <button onClick={()=>setViewUsers(true)} className="btn-press w-full ui-item p-5 flex items-center gap-4 text-left">
-                                                    <div className="bg-white p-3 rounded-full text-[var(--accent)] shadow-sm"><Icons.Users/></div>
-                                                    <div><h4 className="font-bold text-[17px] text-[var(--text-main)]">비밀번호 관리</h4><p className="text-[13px] text-[var(--text-muted)] font-medium">관리자 전용 기능입니다.</p></div>
-                                                </button>
-                                            )}
-                                            <button onClick={()=>onSubmit({type:'LOGOUT'})} className="btn-press w-full bg-[rgba(255,59,48,0.1)] p-5 rounded-[24px] flex items-center gap-4 text-left mt-8">
-                                                <div className="bg-white p-3 rounded-full text-[var(--danger)] shadow-sm"><Icons.X/></div>
-                                                <div><h4 className="font-bold text-[17px] text-[var(--danger)]">로그아웃</h4><p className="text-[13px] text-[var(--danger)] opacity-80 font-medium">현재 기기에서 로그아웃 합니다.</p></div>
-                                            </button>
-                                        </>
-                                    )}
-                                </div>
-                            ) : (
-                                <div className="space-y-4">
-                                    <button onClick={()=>setViewUsers(false)} className="btn-press ui-item text-[14px] font-bold px-5 py-2.5 mb-2 inline-flex items-center gap-2 text-[var(--text-main)]">← 뒤로가기</button>
-                                    <div className="max-h-[50vh] overflow-y-auto space-y-2 pr-2 no-scrollbar">
-                                        {data.allUsers.map(u => (
-                                            <div key={u.sid} className="ui-item p-4 px-5 flex justify-between items-center bg-[var(--bg-body)]">
-                                                <span className="font-bold text-[17px]">{u.sid}</span>
-                                                <span className="bg-white px-4 py-1.5 rounded-full text-[14px] font-bold text-[var(--accent)] shadow-sm">{u.pw}</span>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                );
-            }
-
-            return (
-                <div className={modalClasses}>
-                    <div className="absolute inset-0" onClick={handleClose}></div>
-                    <div className={sheetClasses}>
-                        <div className="ui-drag-indicator"></div>
-                        <div className="flex justify-between items-center mb-8 px-1">
-                            <h3 className="text-[24px] font-[800] tracking-tight">{title}</h3>
-                            <button onClick={handleClose} className="btn-press ui-item p-2.5 rounded-full text-[var(--text-muted)]"><Icons.X/></button>
-                        </div>
-                        
-                        <form onSubmit={e=>{e.preventDefault(); if(title==="설정") return; onSubmit(vals);}} className="space-y-4">
-                            <div className="max-h-[60vh] overflow-y-auto space-y-3 no-scrollbar pb-2 px-1">
-                                {inputs.map(i => <input key={i.k} type={i.type||'text'} placeholder={i.p} value={vals[i.k]||''} onChange={e=>setVals({...vals, [i.k]:e.target.value})} className="w-full ui-input p-5 text-[16px]" /> )}
-                                
-                                {type === 'SCHED' && (
-                                    <label className="flex items-center justify-between ui-input p-5 cursor-pointer mt-4">
-                                        <span className="font-bold text-[16px] text-[var(--danger)]">중요 평가로 지정</span>
-                                        <div className={`ui-toggle ${vals.isExam ? 'bg-[var(--danger)]' : 'bg-[#D1D1D6]'}`}>
-                                            <div className={`ui-toggle-knob ${vals.isExam ? 'translate-x-[20px]' : 'translate-x-0'}`}></div>
-                                        </div>
-                                        <input type="checkbox" className="hidden" checked={vals.isExam||false} onChange={e=>setVals({...vals, isExam: e.target.checked})} />
-                                    </label>
-                                )}
-                            </div>
-                            <div className="flex gap-3 pt-6 px-1">
-                                <button type="button" onClick={handleClose} className="btn-press flex-1 py-4.5 ui-btn-secondary text-[16px] h-[54px]">취소</button>
-                                <button type="submit" className="btn-press flex-1 py-4.5 ui-btn-primary text-[16px] h-[54px]">저장</button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            );
-        }
-
-        // ==========================================
-        // 다이내믹 플로팅 내비게이션 (One UI 스타일)
-        // 갤러리 앱처럼 액티브 탭이 알약 배경을 가짐
-        // ==========================================
-        function NavBtn({id, active, set, icon:Icon, label}) {
-            const isAct = active === id;
-            return (
-                <button onClick={()=>set(id)} className="btn-press relative flex flex-col items-center justify-center flex-1 h-full outline-none z-10 transition-all">
-                    {/* 액티브 시 갤러리 앱처럼 회색 알약 배경 */}
-                    <div className={`absolute inset-0 m-1 rounded-full transition-colors duration-300 ${isAct ? 'bg-[var(--bg-item)]' : 'bg-transparent'}`}></div>
-                    
-                    <div className={`nav-icon relative z-10 p-1 flex justify-center items-center transition-colors duration-300 ${isAct ? 'text-[var(--text-main)]' : 'text-[var(--text-muted)]'}`}>
-                        <Icon/>
-                    </div>
-                    {/* 텍스트는 축소 상태(shrunk)일 때 숨겨짐 (CSS 참조) */}
-                    <span className={`nav-label relative z-10 text-[11px] font-[700] transition-colors duration-300 ${isAct ? 'text-[var(--text-main)]' : 'text-[var(--text-muted)]'}`}>{label}</span>
-                </button>
-            );
-        }
-
-        const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<App />);
-    </script>
-</body>
-</html>
