@@ -27,6 +27,9 @@
         
         .loader { width: 20px; height: 20px; border: 3px solid #E5E5EA; border-top-color: #007AFF; border-radius: 50%; animation: spin 1s linear infinite; }
         @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* 권한 오류 안내 박스 */
+        #permission-error { display: none; }
     </style>
 </head>
 <body class="selection:bg-[#E5F1FF]">
@@ -40,6 +43,15 @@
                 <span class="text-[11px] font-[900] text-[#007AFF]" id="status-text">CONNECTING</span>
             </div>
         </header>
+
+        <!-- Permission Error Message -->
+        <div id="permission-error" class="mx-5 mb-5 p-6 bg-red-50 border border-red-100 rounded-[24px]">
+            <h2 class="text-red-600 font-[900] mb-2">데이터 접근 권한 오류</h2>
+            <p class="text-red-500 text-sm font-[600] leading-relaxed">
+                Firebase 콘솔의 <b>Firestore Database -> Rules</b> 설정이 아래와 같이 되어 있는지 확인해 주세요:<br>
+                <code class="block mt-2 p-2 bg-red-100 rounded text-[12px]">allow read, write: if request.auth != null;</code>
+            </p>
+        </div>
 
         <!-- Main Content Area -->
         <main id="content" class="px-5 space-y-8 mt-4">
@@ -76,24 +88,18 @@
     </div>
 
     <script>
-        // --- 1. CONFIG & INITIALIZATION ---
+        // --- 1. CONFIGURATION (사용자 제공 설정값) ---
         const MY_CONFIG = {
-            apiKey: "YOUR_API_KEY",
-            authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-            projectId: "YOUR_PROJECT_ID",
-            storageBucket: "YOUR_PROJECT_ID.appspot.com",
-            messagingSenderId: "YOUR_SENDER_ID",
-            appId: "YOUR_APP_ID"
+            apiKey: "AIzaSyAP8WRXAjmPdmATfWKnCrCRQNH0ftbBV9w",
+            authDomain: "duru108.firebaseapp.com",
+            projectId: "duru108",
+            storageBucket: "duru108.firebasestorage.app",
+            messagingSenderId: "669255987956",
+            appId: "1:669255987956:web:7479e73d084a2faafb24a1"
         };
 
-        let finalConfig;
-        try {
-            finalConfig = (typeof __firebase_config !== 'undefined' && __firebase_config) ? JSON.parse(__firebase_config) : MY_CONFIG;
-        } catch(e) {
-            finalConfig = MY_CONFIG;
-        }
-
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'duru-gochon-v86-stable';
+        const finalConfig = (typeof __firebase_config !== 'undefined' && __firebase_config) ? JSON.parse(__firebase_config) : MY_CONFIG;
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'duru-stable-v1';
 
         // Firebase Setup
         firebase.initializeApp(finalConfig);
@@ -117,7 +123,7 @@
                 const year = d.getUTCFullYear();
                 const month = String(d.getUTCMonth() + 1).padStart(2, '0');
                 const date = String(d.getUTCDate()).padStart(2, '0');
-                return { str: `${year}-${month}-${date}`, neis: `${year}${month}${date}` };
+                return { str: `${year}-${month}-${date}` };
             };
             return { tdStr: f(kst).str, tmStr: f(new Date(kst.getTime() + 86400000)).str };
         }
@@ -127,98 +133,85 @@
             const statusText = document.getElementById('status-text');
             const mainDot = document.getElementById('main-dot');
 
-            // Check if config is provided for external use
-            if (!finalConfig || !finalConfig.apiKey || finalConfig.apiKey === "YOUR_API_KEY") {
-                if (typeof __firebase_config === 'undefined') {
-                    document.getElementById('content').innerHTML = `
-                        <div class="one-panel p-10 text-center m-5">
-                            <h2 class="text-red-500 font-[900] text-lg mb-2">설정 필요</h2>
-                            <p class="text-gray-500 font-[600] text-sm leading-relaxed">
-                                외부에서 사용하려면 HTML 코드 상단의 MY_CONFIG를<br>본인의 Firebase 정보로 수정해야 합니다.
-                            </p>
-                        </div>
-                    `;
-                    statusText.innerText = "CONFIG REQUIRED";
-                    mainDot.style.backgroundColor = "#FF9500";
-                    return;
-                }
-            }
-
             try {
-                // RULE 3: Auth Before Queries - Ensure authentication is settled first
+                // RULE 3: Auth Before Queries - 익명 인증 시도 및 확인
                 if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
                     await auth.signInWithCustomToken(__initial_auth_token);
                 } else if (!auth.currentUser) {
                     await auth.signInAnonymously();
                 }
 
-                // Wait for confirmation of auth state
+                // 인증 상태 리스너
                 auth.onAuthStateChanged(user => {
                     if (user) {
                         statusText.innerText = "LIVE";
                         mainDot.style.backgroundColor = "#007AFF";
-                        if (!state.syncStarted) startSync(user);
+                        // 인증 완료된 후 최초 1회만 데이터 구독 시작
+                        if (!state.syncStarted) {
+                            state.syncStarted = true;
+                            startSync(user);
+                        }
                     } else {
                         statusText.innerText = "AUTHENTICATING...";
+                        mainDot.style.backgroundColor = "#FF9500";
                     }
                 });
             } catch (e) {
-                statusText.innerText = "AUTH FAILED";
+                statusText.innerText = "AUTH ERROR";
                 mainDot.style.backgroundColor = "#FF3B30";
-                console.error("Auth Error:", e);
+                console.error("Auth Exception:", e);
             }
             render();
         }
 
         function startSync(user) {
-            state.syncStarted = true;
-            
-            // RULE 1: Standardized Paths
+            // RULE 1: Strict Paths
             const pub = (col) => db.collection('artifacts').doc(appId).collection('public').doc('data').collection(col);
             const priv = (col) => db.collection('artifacts').doc(appId).collection('users').doc(user.uid).collection(col);
 
-            const errLog = (colName) => (err) => {
+            const handleError = (colName) => (err) => {
                 console.error(`Sync Error [${colName}]:`, err.message);
                 if (err.code === 'permission-denied') {
-                    document.getElementById('status-text').innerText = "PERMISSION DENIED";
+                    document.getElementById('permission-error').style.display = 'block';
+                    document.getElementById('status-text').innerText = "RESTRICTED";
                 }
             };
 
-            // Setup listeners
+            // 데이터 실시간 감시 시작
             pub('announcements').onSnapshot(s => { 
                 state.data.announcements = s.docs.map(d=>({id:d.id, ...d.data()})).sort((a,b)=>b.at-a.at); 
                 render(); 
-            }, errLog('announcements'));
+            }, handleError('announcements'));
 
             pub('schedules').onSnapshot(s => { 
                 state.data.schedules = s.docs.map(d=>({id:d.id, ...d.data()})).sort((a,b)=>new Date(a.date)-new Date(b.date)); 
                 render(); 
-            }, errLog('schedules'));
+            }, handleError('schedules'));
 
             pub('materials').onSnapshot(s => { 
                 state.data.materials = s.docs.map(d=>({id:d.id, ...d.data()})).sort((a,b)=>b.at-a.at); 
                 render(); 
-            }, errLog('materials'));
+            }, handleError('materials'));
 
             pub('memos').onSnapshot(s => { 
                 s.docs.forEach(d=>state.data.memos[d.id]=d.data().content); 
                 render(); 
-            }, errLog('memos'));
+            }, handleError('memos'));
 
             pub('meals').onSnapshot(s => { 
                 s.docs.forEach(d=>state.data.meals[d.id]=d.data().menu); 
                 render(); 
-            }, errLog('meals'));
+            }, handleError('meals'));
 
             pub('timetables').onSnapshot(s => { 
                 s.docs.forEach(d=>state.data.timetables[d.id]=d.data().periods); 
                 render(); 
-            }, errLog('timetables'));
+            }, handleError('timetables'));
 
             priv('planner').onSnapshot(s => { 
                 state.data.planner = s.docs.map(d=>({id:d.id, ...d.data()})).sort((a,b)=>b.at-a.at); 
                 render(); 
-            }, errLog('planner'));
+            }, handleError('planner'));
         }
 
         // --- 3. UI RENDERING ---
@@ -258,17 +251,17 @@
                             <h3 class="font-[900] text-[17px]">${a.title || '제목 없음'}</h3>
                             <p class="text-[14px] text-[#5C5C5C] mt-2 font-[600] leading-relaxed">${a.content || '내용 없음'}</p>
                         </div>
-                    `).join('') : '<p class="text-center text-gray-400 py-6 font-[600]">공지사항이 없습니다.</p>'}</div>
+                    `).join('') : '<p class="text-center text-gray-400 py-6 font-[600]">새로운 공지사항이 없습니다.</p>'}</div>
                 </div>
                 <div class="one-panel p-8 text-center bg-gradient-to-br from-[#007AFF]/10 to-white min-h-[140px] flex flex-col justify-center">
-                    <p class="text-[12px] font-[900] text-[#007AFF] mb-1 tracking-widest uppercase">다가오는 주요 일정</p>
+                    <p class="text-[12px] font-[900] text-[#007AFF] mb-1 tracking-widest uppercase">다가오는 일정</p>
                     <div class="font-[900] text-[22px] text-[#1D1D1F]">${nextEvt ? nextEvt.title : '등록된 일정 없음'}</div>
                     ${nextEvt ? `<p class="text-[13px] font-[800] text-[#8E8E93] mt-1">${nextEvt.date}</p>` : ''}
                 </div>
                 <div class="one-panel p-8">
                     <div class="flex justify-between items-center mb-6"><h3 class="font-[900] text-[22px]">오늘의 점심 🍱</h3><button onclick="openInputModal('MEAL', '${state.dates.tdStr}')" class="text-[#007AFF] font-[900] text-sm">입력</button></div>
                     <div class="one-item p-6 flex flex-wrap justify-center gap-2">
-                        ${meal ? meal.split(',').map(m => `<span class="bg-white px-4 py-1.5 rounded-full text-[15px] font-[900] shadow-sm">${m.trim()}</span>`).join('') : '<p class="text-gray-400 font-[800] py-4 text-center w-full">메뉴를 입력해 보세요.</p>'}
+                        ${meal ? meal.split(',').map(m => `<span class="bg-white px-4 py-1.5 rounded-full text-[15px] font-[900] shadow-sm">${m.trim()}</span>`).join('') : '<p class="text-gray-400 font-[800] py-4 text-center w-full">오늘의 메뉴를 입력해 보세요.</p>'}
                     </div>
                 </div>
             `;
@@ -288,7 +281,7 @@
                             </div>
                             <button onclick="openInputModal('MEMO', '${state.dates.tdStr}_${idx+1}')" class="btn-press text-gray-300"><svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 4v16m8-8H4"/></svg></button>
                         </div>
-                    `).join('') : '<div class="one-panel p-20 text-center text-gray-400 font-[900]">정보가 없습니다.</div>'}
+                    `).join('') : '<div class="one-panel p-20 text-center text-gray-400 font-[900]">등록된 시간표 정보가 없습니다.</div>'}
                 </div>
             `;
         }
@@ -313,7 +306,6 @@
                 <div class="space-y-8 pb-10">
                     <div class="one-panel p-8">
                         <div class="flex justify-between items-center mb-6"><h2 class="text-[22px] font-[900]">내 플래너</h2><button onclick="openInputModal('PLAN_ADD')" class="btn-press bg-[#007AFF] text-white w-9 h-9 rounded-full flex items-center justify-center font-bold text-xl">+</button></div>
-                        <p class="text-[13px] text-gray-400 font-[600] mb-4 px-1">기록한 할 일은 본인 기기에만 저장됩니다.</p>
                         <div class="space-y-4">
                             ${(state.data.planner || []).length ? state.data.planner.map(t => `
                                 <div class="bg-white border border-[#E5E5EA] rounded-[24px] p-5 flex items-center justify-between shadow-sm">
@@ -323,16 +315,16 @@
                                     </button>
                                     <button onclick="deleteDoc('planner', '${t.id}', true)" class="text-red-400 p-2 font-bold">×</button>
                                 </div>
-                            `).join('') : '<p class="text-center text-gray-400 py-6 font-[800]">할 일이 없습니다.</p>'}
+                            `).join('') : '<p class="text-center text-gray-400 py-6 font-[800]">오늘의 계획을 세워보세요.</p>'}
                         </div>
                     </div>
                     <div class="one-panel p-8">
-                        <div class="flex justify-between items-center mb-6"><h2 class="text-[22px] font-[900]">통합 일정</h2><button onclick="openInputModal('SCHED')" class="text-[#007AFF] font-[900] bg-[#F2F2F7] px-4 py-2 rounded-full text-sm">추가</button></div>
-                        <div class="space-y-4">${(state.data.schedules || []).length ? state.data.schedules.map(s => `<div class="one-item p-5 flex justify-between items-center relative group"><div><h3 class="font-[900]">${s.title}</h3><p class="text-[12px] font-[800] text-[#8E8E93] mt-1">${s.date}</p></div><button onclick="deleteDoc('schedules', '${s.id}')" class="text-red-400 p-2">×</button></div>`).join('') : '<p class="text-center text-gray-400 py-6 font-[600]">일정이 없습니다.</p>'}</div>
+                        <div class="flex justify-between items-center mb-6"><h2 class="text-[22px] font-[900]">통합 일정</h2><button onclick="openInputModal('SCHED')" class="text-[#007AFF] font-[900] bg-[#F2F2F7] px-4 py-2 rounded-full text-sm">일정 추가</button></div>
+                        <div class="space-y-4">${(state.data.schedules || []).length ? state.data.schedules.map(s => `<div class="one-item p-5 flex justify-between items-center relative group"><div><h3 class="font-[900]">${s.title}</h3><p class="text-[12px] font-[800] text-[#8E8E93] mt-1">${s.date}</p></div><button onclick="deleteDoc('schedules', '${s.id}')" class="text-red-400 p-2">×</button></div>`).join('') : '<p class="text-center text-gray-400 py-6 font-[600]">예정된 일정이 없습니다.</p>'}</div>
                     </div>
                     <div class="one-panel p-8">
                         <div class="flex justify-between items-center mb-6"><h2 class="text-[22px] font-[900]">자료 보관함</h2><button onclick="openInputModal('FILE')" class="text-[#007AFF] font-[900] bg-[#F2F2F7] px-4 py-2 rounded-full text-sm">공유</button></div>
-                        <div class="grid gap-4">${(state.data.materials || []).length ? state.data.materials.map(m => `<a href="${m.link}" target="_blank" class="one-item p-5 flex items-center justify-between shadow-sm border border-white"><div><h3 class="font-[900]">${m.title}</h3><p class="text-[12px] font-[800] text-[#8E8E93]">${m.subject}</p></div><button onclick="event.preventDefault(); deleteDoc('materials', '${m.id}')" class="text-red-400 p-2">×</button></a>`).join('') : '<p class="text-center text-gray-400 py-6 font-[600]">공유된 자료가 없습니다.</p>'}</div>
+                        <div class="grid gap-4">${(state.data.materials || []).length ? state.data.materials.map(m => `<a href="${m.link}" target="_blank" class="one-item p-5 flex items-center justify-between shadow-sm border border-white"><div><h3 class="font-[900]">${m.title}</h3><p class="text-[12px] font-[800] text-[#8E8E93]">${m.subject}</p></div><button onclick="event.preventDefault(); deleteDoc('materials', '${m.id}')" class="text-red-400 p-2">×</button></a>`).join('') : '<p class="text-center text-gray-400 py-6 font-[600]">공유된 자료가 아직 없습니다.</p>'}</div>
                     </div>
                 </div>
             `;
@@ -347,7 +339,7 @@
 
         async function deleteDoc(col, id, isPrivate = false) {
             const user = auth.currentUser;
-            if (!user || !confirm("삭제하시겠습니까?")) return;
+            if (!user || !confirm("정말로 삭제하시겠습니까?")) return;
             const ref = isPrivate ? db.collection('artifacts').doc(appId).collection('users').doc(user.uid).collection(col) : db.collection('artifacts').doc(appId).collection('public').doc('data').collection(col);
             await ref.doc(id).delete();
         }
@@ -363,10 +355,10 @@
             const title = {NOTICE:'새 공지', SCHED:'일정 등록', FILE:'자료 공유', PLAN_ADD:'할 일 추가', MEMO:'수업 메모', MEAL:'식단 입력', TIME:'시간표 편집'}[payload.type];
             content = `
                 <div class="one-panel w-full max-w-md p-8 m-4 rounded-t-[40px] md:rounded-[40px] animate-in slide-in-from-bottom duration-300">
-                    <h3 class="text-[22px] font-[900] mb-8">${title}</h3>
+                    <h3 class="text-[22px] font-[900] mb-8 text-center">${title}</h3>
                     <div class="space-y-4">
                         ${payload.type === 'PLAN_ADD' || payload.type === 'MEMO' || payload.type === 'MEAL' || payload.type === 'TIME' ? `<input id="val-1" placeholder="${payload.type==='MEAL'?'메뉴들을 쉼표로 구분':(payload.type==='TIME'?'과목들을 쉼표로 구분':'내용 입력')}" class="w-full one-input p-5 text-lg">` : ''}
-                        ${payload.type === 'NOTICE' ? `<input id="val-1" placeholder="공지 제목" class="w-full one-input p-5"><input id="val-2" placeholder="상세 내용" class="w-full one-input p-5">` : ''}
+                        ${payload.type === 'NOTICE' ? `<input id="val-1" placeholder="제목" class="w-full one-input p-5"><textarea id="val-2" placeholder="상세 내용" class="w-full one-input p-5 min-h-[100px]"></textarea>` : ''}
                         ${payload.type === 'SCHED' ? `<input id="val-1" placeholder="일정 이름" class="w-full one-input p-5"><input id="val-2" type="date" class="w-full one-input p-5">` : ''}
                         ${payload.type === 'FILE' ? `<input id="val-1" placeholder="자료 이름" class="w-full one-input p-5"><input id="val-2" placeholder="과목" class="w-full one-input p-5"><input id="val-3" placeholder="URL 링크" class="w-full one-input p-5">` : ''}
                     </div>
@@ -381,7 +373,7 @@
 
         async function submitInput(type, targetId) {
             const user = auth.currentUser;
-            if (!user) return alert("인증이 완료되지 않았습니다.");
+            if (!user) return alert("인증 처리 중입니다. 잠시만 기다려 주세요.");
 
             const pub = (col) => db.collection('artifacts').doc(appId).collection('public').doc('data').collection(col);
             const priv = (col) => db.collection('artifacts').doc(appId).collection('users').doc(user.uid).collection(col);
@@ -398,7 +390,10 @@
                 if (type === 'MEMO') await pub('memos').doc(targetId).set({ content: v1, at: Date.now() });
                 if (type === 'MEAL') await pub('meals').doc(targetId).set({ menu: v1, at: Date.now() });
                 if (type === 'TIME') await pub('timetables').doc(targetId).set({ periods: (v1 || '').split(',').map(s=>s.trim()), at: Date.now() });
-            } catch(e) { console.error(e); alert("데이터 저장 권한이 없습니다."); }
+            } catch(e) { 
+                console.error(e); 
+                document.getElementById('permission-error').style.display = 'block';
+            }
             closeModal();
         }
 
@@ -421,7 +416,6 @@
             }
         };
 
-        // Run
         init();
     </script>
 </body>
