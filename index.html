@@ -10,7 +10,7 @@
     <script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore-compat.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@400;600;800;900&display=swap" rel="stylesheet">
     <style>
-        body { font-family: 'Pretendard', sans-serif; background-color: #F2F2F7; -webkit-tap-highlight-color: transparent; }
+        body { font-family: 'Pretendard', sans-serif; background-color: #F2F2F7; -webkit-tap-highlight-color: transparent; overflow-x: hidden; }
         .one-panel { background: white; border-radius: 32px; box-shadow: 0 4px 20px rgba(0,0,0,0.02), 0 0 1px rgba(0,0,0,0.05); }
         .one-item { background: #F2F2F7; border-radius: 24px; }
         .btn-press:active { transform: scale(0.96); opacity: 0.8; }
@@ -25,8 +25,7 @@
         .pulse-dot { width: 6px; height: 6px; background: #007AFF; border-radius: 50%; animation: pulse 1.5s infinite; }
         @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.3; } 100% { opacity: 1; } }
         
-        /* 로딩 애니메이션 */
-        .loader { width: 24px; height: 24px; border: 3px solid #E5E5EA; border-top-color: #007AFF; border-radius: 50%; animation: spin 1s linear infinite; }
+        .loader { width: 20px; height: 20px; border: 3px solid #E5E5EA; border-top-color: #007AFF; border-radius: 50%; animation: spin 1s linear infinite; }
         @keyframes spin { to { transform: rotate(360deg); } }
     </style>
 </head>
@@ -37,7 +36,6 @@
         <header class="sticky top-0 z-40 bg-[#F2F2F7]/90 backdrop-blur-xl px-6 pt-12 pb-4 flex items-center justify-between">
             <h1 class="text-[30px] font-[900] tracking-tight">Duru</h1>
             <div id="status-badge" class="live-badge">
-                <div class="loader mr-2 hidden" id="main-loader"></div>
                 <div class="pulse-dot" id="main-dot"></div>
                 <span class="text-[11px] font-[900] text-[#007AFF]" id="status-text">CONNECTING</span>
             </div>
@@ -45,7 +43,10 @@
 
         <!-- Main Content Area -->
         <main id="content" class="px-5 space-y-8 mt-4">
-            <div class="py-20 text-center text-gray-400 font-[800]">데이터를 불러오는 중입니다...</div>
+            <div id="loading-view" class="py-20 text-center">
+                <div class="loader mx-auto mb-4"></div>
+                <p class="text-gray-400 font-[800]">서버 연결 중...</p>
+            </div>
         </main>
 
         <!-- Floating UI Navigation -->
@@ -75,11 +76,27 @@
     </div>
 
     <script>
-        // --- 1. CONFIG ---
-        const firebaseConfig = JSON.parse(__firebase_config);
+        // --- 1. CONFIG & INITIALIZATION ---
+        const MY_CONFIG = {
+            apiKey: "YOUR_API_KEY",
+            authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+            projectId: "YOUR_PROJECT_ID",
+            storageBucket: "YOUR_PROJECT_ID.appspot.com",
+            messagingSenderId: "YOUR_SENDER_ID",
+            appId: "YOUR_APP_ID"
+        };
+
+        let finalConfig;
+        try {
+            finalConfig = (typeof __firebase_config !== 'undefined' && __firebase_config) ? JSON.parse(__firebase_config) : MY_CONFIG;
+        } catch(e) {
+            finalConfig = MY_CONFIG;
+        }
+
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'duru-gochon-v86-stable';
 
-        firebase.initializeApp(firebaseConfig);
+        // Firebase Setup
+        firebase.initializeApp(finalConfig);
         const db = firebase.firestore();
         const auth = firebase.auth();
 
@@ -89,7 +106,8 @@
                 announcements: [], schedules: [], materials: [], planner: [], 
                 memos: {}, meals: {}, timetables: {} 
             },
-            dates: getDates()
+            dates: getDates(),
+            syncStarted: false
         };
 
         function getDates() {
@@ -101,88 +119,106 @@
                 const date = String(d.getUTCDate()).padStart(2, '0');
                 return { str: `${year}-${month}-${date}`, neis: `${year}${month}${date}` };
             };
-            const td = f(kst);
-            const tm = f(new Date(kst.getTime() + 86400000));
-            return { tdStr: td.str, tmStr: tm.str };
+            return { tdStr: f(kst).str, tmStr: f(new Date(kst.getTime() + 86400000)).str };
         }
 
-        // --- 2. CORE LOGIC ---
+        // --- 2. AUTH & SYNC ENGINE ---
         async function init() {
             const statusText = document.getElementById('status-text');
             const mainDot = document.getElementById('main-dot');
 
+            // Check if config is provided for external use
+            if (!finalConfig || !finalConfig.apiKey || finalConfig.apiKey === "YOUR_API_KEY") {
+                if (typeof __firebase_config === 'undefined') {
+                    document.getElementById('content').innerHTML = `
+                        <div class="one-panel p-10 text-center m-5">
+                            <h2 class="text-red-500 font-[900] text-lg mb-2">설정 필요</h2>
+                            <p class="text-gray-500 font-[600] text-sm leading-relaxed">
+                                외부에서 사용하려면 HTML 코드 상단의 MY_CONFIG를<br>본인의 Firebase 정보로 수정해야 합니다.
+                            </p>
+                        </div>
+                    `;
+                    statusText.innerText = "CONFIG REQUIRED";
+                    mainDot.style.backgroundColor = "#FF9500";
+                    return;
+                }
+            }
+
             try {
-                if (!auth.currentUser) {
+                // RULE 3: Auth Before Queries - Ensure authentication is settled first
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await auth.signInWithCustomToken(__initial_auth_token);
+                } else if (!auth.currentUser) {
                     await auth.signInAnonymously();
                 }
-                
+
+                // Wait for confirmation of auth state
                 auth.onAuthStateChanged(user => {
                     if (user) {
-                        statusText.innerText = "CONNECTED";
-                        startSync(user);
+                        statusText.innerText = "LIVE";
+                        mainDot.style.backgroundColor = "#007AFF";
+                        if (!state.syncStarted) startSync(user);
                     } else {
-                        statusText.innerText = "AUTH ERROR";
-                        mainDot.style.backgroundColor = "#FF3B30";
+                        statusText.innerText = "AUTHENTICATING...";
                     }
                 });
             } catch (e) {
-                statusText.innerText = "INIT ERROR";
-                console.error(e);
+                statusText.innerText = "AUTH FAILED";
+                mainDot.style.backgroundColor = "#FF3B30";
+                console.error("Auth Error:", e);
             }
             render();
         }
 
         function startSync(user) {
-            // RULE 1: /artifacts/{appId}/public/data/{collectionName}
+            state.syncStarted = true;
+            
+            // RULE 1: Standardized Paths
             const pub = (col) => db.collection('artifacts').doc(appId).collection('public').doc('data').collection(col);
             const priv = (col) => db.collection('artifacts').doc(appId).collection('users').doc(user.uid).collection(col);
 
-            const errCb = (err) => {
+            const errLog = (colName) => (err) => {
+                console.error(`Sync Error [${colName}]:`, err.message);
                 if (err.code === 'permission-denied') {
-                    document.getElementById('content').innerHTML = `
-                        <div class="one-panel p-10 text-center">
-                            <h2 class="text-red-500 font-[900] text-lg mb-2">접근 권한 오류</h2>
-                            <p class="text-gray-500 font-[600]">데이터베이스 규칙을 확인해 주세요.</p>
-                        </div>
-                    `;
+                    document.getElementById('status-text').innerText = "PERMISSION DENIED";
                 }
-                console.error("Sync Error:", err);
             };
 
+            // Setup listeners
             pub('announcements').onSnapshot(s => { 
                 state.data.announcements = s.docs.map(d=>({id:d.id, ...d.data()})).sort((a,b)=>b.at-a.at); 
                 render(); 
-            }, errCb);
+            }, errLog('announcements'));
 
             pub('schedules').onSnapshot(s => { 
                 state.data.schedules = s.docs.map(d=>({id:d.id, ...d.data()})).sort((a,b)=>new Date(a.date)-new Date(b.date)); 
                 render(); 
-            }, errCb);
+            }, errLog('schedules'));
 
             pub('materials').onSnapshot(s => { 
                 state.data.materials = s.docs.map(d=>({id:d.id, ...d.data()})).sort((a,b)=>b.at-a.at); 
                 render(); 
-            }, errCb);
+            }, errLog('materials'));
 
             pub('memos').onSnapshot(s => { 
                 s.docs.forEach(d=>state.data.memos[d.id]=d.data().content); 
                 render(); 
-            }, errCb);
+            }, errLog('memos'));
 
             pub('meals').onSnapshot(s => { 
                 s.docs.forEach(d=>state.data.meals[d.id]=d.data().menu); 
                 render(); 
-            }, errCb);
+            }, errLog('meals'));
 
             pub('timetables').onSnapshot(s => { 
                 s.docs.forEach(d=>state.data.timetables[d.id]=d.data().periods); 
                 render(); 
-            }, errCb);
+            }, errLog('timetables'));
 
             priv('planner').onSnapshot(s => { 
                 state.data.planner = s.docs.map(d=>({id:d.id, ...d.data()})).sort((a,b)=>b.at-a.at); 
                 render(); 
-            }, errCb);
+            }, errLog('planner'));
         }
 
         // --- 3. UI RENDERING ---
@@ -212,8 +248,7 @@
 
         function renderHome() {
             const meal = state.data.meals[state.dates.tdStr];
-            const schedules = state.data.schedules || [];
-            const nextEvt = schedules.filter(s => new Date(s.date) >= new Date(state.dates.tdStr))[0];
+            const nextEvt = (state.data.schedules || []).filter(s => new Date(s.date) >= new Date(state.dates.tdStr))[0];
 
             return `
                 <div class="one-panel p-8">
@@ -223,17 +258,17 @@
                             <h3 class="font-[900] text-[17px]">${a.title || '제목 없음'}</h3>
                             <p class="text-[14px] text-[#5C5C5C] mt-2 font-[600] leading-relaxed">${a.content || '내용 없음'}</p>
                         </div>
-                    `).join('') : '<p class="text-center text-gray-400 py-6 font-[600]">공지사항이 비어있습니다.</p>'}</div>
+                    `).join('') : '<p class="text-center text-gray-400 py-6 font-[600]">공지사항이 없습니다.</p>'}</div>
                 </div>
                 <div class="one-panel p-8 text-center bg-gradient-to-br from-[#007AFF]/10 to-white min-h-[140px] flex flex-col justify-center">
-                    <p class="text-[12px] font-[900] text-[#007AFF] mb-1 tracking-widest uppercase">다가오는 주요 학급 일정</p>
-                    <div class="font-[900] text-[22px] text-[#1D1D1F]">${nextEvt ? nextEvt.title : '등록된 일정이 없습니다'}</div>
+                    <p class="text-[12px] font-[900] text-[#007AFF] mb-1 tracking-widest uppercase">다가오는 주요 일정</p>
+                    <div class="font-[900] text-[22px] text-[#1D1D1F]">${nextEvt ? nextEvt.title : '등록된 일정 없음'}</div>
                     ${nextEvt ? `<p class="text-[13px] font-[800] text-[#8E8E93] mt-1">${nextEvt.date}</p>` : ''}
                 </div>
                 <div class="one-panel p-8">
-                    <div class="flex justify-between items-center mb-6"><h3 class="font-[900] text-[22px]">오늘의 점심 🍱</h3><button onclick="openInputModal('MEAL', '${state.dates.tdStr}')" class="text-[#007AFF] font-[900] text-sm">입력하기</button></div>
+                    <div class="flex justify-between items-center mb-6"><h3 class="font-[900] text-[22px]">오늘의 점심 🍱</h3><button onclick="openInputModal('MEAL', '${state.dates.tdStr}')" class="text-[#007AFF] font-[900] text-sm">입력</button></div>
                     <div class="one-item p-6 flex flex-wrap justify-center gap-2">
-                        ${meal ? meal.split(',').map(m => `<span class="bg-white px-4 py-1.5 rounded-full text-[15px] font-[900] shadow-sm">${m.trim()}</span>`).join('') : '<p class="text-gray-400 font-[800] py-4 text-center w-full">오늘의 메뉴를 입력해 보세요.</p>'}
+                        ${meal ? meal.split(',').map(m => `<span class="bg-white px-4 py-1.5 rounded-full text-[15px] font-[900] shadow-sm">${m.trim()}</span>`).join('') : '<p class="text-gray-400 font-[800] py-4 text-center w-full">메뉴를 입력해 보세요.</p>'}
                     </div>
                 </div>
             `;
@@ -242,7 +277,7 @@
         function renderTime() {
             const list = state.data.timetables[state.dates.tdStr] || [];
             return `
-                <div class="one-panel p-2 flex mb-6 shadow-inner bg-[#F2F2F7]"><div class="flex-1 py-3 text-center rounded-[24px] bg-white shadow-sm font-[900]">오늘의 시간표</div></div>
+                <div class="one-panel p-2 flex mb-6 shadow-inner bg-[#F2F2F7]"><div class="flex-1 py-3 text-center rounded-[24px] bg-white shadow-sm font-[900]">오늘 시간표</div></div>
                 <div class="space-y-4">
                     <button onclick="openInputModal('TIME', '${state.dates.tdStr}')" class="w-full py-5 one-panel text-[#007AFF] font-[900] text-lg border-2 border-dashed border-[#007AFF]/20 flex items-center justify-center gap-3">전체 시간표 편집</button>
                     ${list.length ? list.map((t, idx) => `
@@ -253,7 +288,7 @@
                             </div>
                             <button onclick="openInputModal('MEMO', '${state.dates.tdStr}_${idx+1}')" class="btn-press text-gray-300"><svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 4v16m8-8H4"/></svg></button>
                         </div>
-                    `).join('') : '<div class="one-panel p-20 text-center text-gray-400 font-[900]">등록된 시간표가 없습니다.</div>'}
+                    `).join('') : '<div class="one-panel p-20 text-center text-gray-400 font-[900]">정보가 없습니다.</div>'}
                 </div>
             `;
         }
@@ -278,7 +313,7 @@
                 <div class="space-y-8 pb-10">
                     <div class="one-panel p-8">
                         <div class="flex justify-between items-center mb-6"><h2 class="text-[22px] font-[900]">내 플래너</h2><button onclick="openInputModal('PLAN_ADD')" class="btn-press bg-[#007AFF] text-white w-9 h-9 rounded-full flex items-center justify-center font-bold text-xl">+</button></div>
-                        <p class="text-[13px] text-gray-400 font-[600] mb-4 px-1">기록한 할 일은 본인만 볼 수 있습니다.</p>
+                        <p class="text-[13px] text-gray-400 font-[600] mb-4 px-1">기록한 할 일은 본인 기기에만 저장됩니다.</p>
                         <div class="space-y-4">
                             ${(state.data.planner || []).length ? state.data.planner.map(t => `
                                 <div class="bg-white border border-[#E5E5EA] rounded-[24px] p-5 flex items-center justify-between shadow-sm">
@@ -292,7 +327,7 @@
                         </div>
                     </div>
                     <div class="one-panel p-8">
-                        <div class="flex justify-between items-center mb-6"><h2 class="text-[22px] font-[900]">통합 학사 일정</h2><button onclick="openInputModal('SCHED')" class="text-[#007AFF] font-[900] bg-[#F2F2F7] px-4 py-2 rounded-full text-sm">추가</button></div>
+                        <div class="flex justify-between items-center mb-6"><h2 class="text-[22px] font-[900]">통합 일정</h2><button onclick="openInputModal('SCHED')" class="text-[#007AFF] font-[900] bg-[#F2F2F7] px-4 py-2 rounded-full text-sm">추가</button></div>
                         <div class="space-y-4">${(state.data.schedules || []).length ? state.data.schedules.map(s => `<div class="one-item p-5 flex justify-between items-center relative group"><div><h3 class="font-[900]">${s.title}</h3><p class="text-[12px] font-[800] text-[#8E8E93] mt-1">${s.date}</p></div><button onclick="deleteDoc('schedules', '${s.id}')" class="text-red-400 p-2">×</button></div>`).join('') : '<p class="text-center text-gray-400 py-6 font-[600]">일정이 없습니다.</p>'}</div>
                     </div>
                     <div class="one-panel p-8">
@@ -305,15 +340,19 @@
 
         // --- 4. DATA ACTIONS ---
         async function togglePlanner(id, done) {
-            await db.collection('artifacts').doc(appId).collection('users').doc(auth.currentUser.uid).collection('planner').doc(id).update({ done });
+            const user = auth.currentUser;
+            if (!user) return;
+            await db.collection('artifacts').doc(appId).collection('users').doc(user.uid).collection('planner').doc(id).update({ done });
         }
+
         async function deleteDoc(col, id, isPrivate = false) {
-            if (!confirm("삭제하시겠습니까?")) return;
-            const ref = isPrivate ? db.collection('artifacts').doc(appId).collection('users').doc(auth.currentUser.uid).collection(col) : db.collection('artifacts').doc(appId).collection('public').doc('data').collection(col);
+            const user = auth.currentUser;
+            if (!user || !confirm("삭제하시겠습니까?")) return;
+            const ref = isPrivate ? db.collection('artifacts').doc(appId).collection('users').doc(user.uid).collection(col) : db.collection('artifacts').doc(appId).collection('public').doc('data').collection(col);
             await ref.doc(id).delete();
         }
 
-        // --- 5. MODALS & NAVIGATION ---
+        // --- 5. MODALS & UI HELPERS ---
         function openInputModal(type, targetId = '') { renderModal('INPUT', { type, targetId }); }
 
         function renderModal(type, payload = {}) {
@@ -341,8 +380,12 @@
         }
 
         async function submitInput(type, targetId) {
+            const user = auth.currentUser;
+            if (!user) return alert("인증이 완료되지 않았습니다.");
+
             const pub = (col) => db.collection('artifacts').doc(appId).collection('public').doc('data').collection(col);
-            const priv = (col) => db.collection('artifacts').doc(appId).collection('users').doc(auth.currentUser.uid).collection(col);
+            const priv = (col) => db.collection('artifacts').doc(appId).collection('users').doc(user.uid).collection(col);
+            
             try {
                 const v1 = document.getElementById('val-1')?.value;
                 const v2 = document.getElementById('val-2')?.value;
@@ -352,16 +395,15 @@
                 if (type === 'PLAN_ADD') await priv('planner').add({ text: v1, done: false, date: state.dates.tdStr, at: Date.now() });
                 if (type === 'SCHED') await pub('schedules').add({ title: v1, date: v2, at: Date.now() });
                 if (type === 'FILE') await pub('materials').add({ title: v1, subject: v2, link: v3, at: Date.now() });
-                if (type === 'MEMO') await pub('memos').doc(targetId).set({ content: v1 });
-                if (type === 'MEAL') await pub('meals').doc(targetId).set({ menu: v1 });
-                if (type === 'TIME') await pub('timetables').doc(targetId).set({ periods: v1.split(',').map(s=>s.trim()) });
-            } catch(e) { console.error(e); }
+                if (type === 'MEMO') await pub('memos').doc(targetId).set({ content: v1, at: Date.now() });
+                if (type === 'MEAL') await pub('meals').doc(targetId).set({ menu: v1, at: Date.now() });
+                if (type === 'TIME') await pub('timetables').doc(targetId).set({ periods: (v1 || '').split(',').map(s=>s.trim()), at: Date.now() });
+            } catch(e) { console.error(e); alert("데이터 저장 권한이 없습니다."); }
             closeModal();
         }
 
         function closeModal() { document.getElementById('modal-container').classList.add('hidden'); }
 
-        // 스크롤 스마트 바 애니메이션 (버그 수정: pointer-events 관리)
         window.onscroll = function() {
             const nav = document.getElementById('nav-container');
             const wrap = document.getElementById('floating-bar');
@@ -379,8 +421,8 @@
             }
         };
 
+        // Run
         init();
     </script>
 </body>
 </html>
-
