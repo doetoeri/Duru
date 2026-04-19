@@ -3,768 +3,426 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Duru - 통합 스마트 클래스</title>
+    <title>Duru - 실시간 학급 협업</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet">
+    <script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore-compat.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@400;600;800;900&display=swap" rel="stylesheet">
     <style>
         body { font-family: 'Pretendard', sans-serif; background-color: #F2F2F7; -webkit-tap-highlight-color: transparent; overflow-x: hidden; }
-        
-        /* Duru Design System */
         .one-panel { background: white; border-radius: 32px; box-shadow: 0 4px 20px rgba(0,0,0,0.02), 0 0 1px rgba(0,0,0,0.05); }
         .one-item { background: #F2F2F7; border-radius: 24px; }
         .btn-press:active { transform: scale(0.96); opacity: 0.8; }
         .btn-press { transition: transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.2s; }
         .nav-active { background-color: #F2F2F7; color: #000 !important; }
-        .hidden-text { max-height: 0; opacity: 0; margin-top: 0; pointer-events: none; overflow: hidden; }
+        .hidden-text { max-height: 0; opacity: 0; margin-top: 0; pointer-events: none; }
         .no-scrollbar::-webkit-scrollbar { display: none; }
+        input:focus { outline: none; border-color: #007AFF; }
         .modal-bg { background: rgba(0,0,0,0.4); backdrop-filter: blur(10px); }
         
-        /* Utility */
-        .material-symbols-rounded { font-variation-settings: 'FILL' 0, 'wght' 600, 'GRAD' 0, 'opsz' 24; }
-        .active-tab .material-symbols-rounded { font-variation-settings: 'FILL' 1, 'wght' 600, 'GRAD' 0, 'opsz' 24; }
-        .toast-active { transform: translate(-50%, -24px) !important; opacity: 1 !important; }
+        .live-badge { display: flex; align-items: center; gap: 6px; background: white; padding: 6px 12px; border-radius: 100px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+        .pulse-dot { width: 6px; height: 6px; background: #007AFF; border-radius: 50%; animation: pulse 1.5s infinite; }
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.3; } 100% { opacity: 1; } }
         
-        /* Loading Animation */
-        .loader { width: 30px; height: 30px; border: 4px solid #E5E5EA; border-top-color: #007AFF; border-radius: 50%; animation: spin 1s linear infinite; }
+        .loader { width: 20px; height: 20px; border: 3px solid #E5E5EA; border-top-color: #007AFF; border-radius: 50%; animation: spin 1s linear infinite; }
         @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* 권한 오류 안내 박스 */
+        #permission-error { display: none; }
     </style>
 </head>
-<body class="selection:bg-[#E5F1FF] text-[#1D1D1F]">
+<body class="selection:bg-[#E5F1FF]">
 
-    <div id="app" class="max-w-md mx-auto min-h-screen relative pb-32">
-        <!-- Loading Screen -->
-        <div id="loading" class="fixed inset-0 bg-white z-[100] flex flex-col items-center justify-center transition-opacity duration-500">
-            <div class="loader mb-4"></div>
-            <p class="text-[14px] font-[800] text-[#8E8E93] animate-pulse">클래스 데이터를 동기화 중입니다...</p>
-        </div>
-
-        <!-- In-app Toast -->
-        <div id="toast" class="fixed bottom-0 left-1/2 -translate-x-1/2 mb-24 z-[300] bg-[#313033] text-white px-6 py-3 rounded-[100px] text-[13px] font-[800] shadow-xl opacity-0 transition-all duration-300 pointer-events-none whitespace-nowrap"></div>
-
-        <!-- Login Modal (Required only for specific actions) -->
-        <div id="login-modal" class="fixed inset-0 z-[250] hidden modal-bg items-center justify-center p-6">
-            <div class="one-panel w-full max-w-sm p-8 animate-in zoom-in-95 duration-200">
-                <div class="w-16 h-16 bg-[#E5F1FF] text-[#007AFF] rounded-[20px] flex items-center justify-center mx-auto mb-4">
-                    <span class="material-symbols-rounded text-3xl">badge</span>
-                </div>
-                <h2 class="text-[22px] font-[900] mb-2 text-center">학생 인증</h2>
-                <p class="text-[13px] text-[#8E8E93] font-[600] text-center mb-6">시험 응시 및 기록 확인을 위해<br>학번 5자리를 입력해주세요.</p>
-                <input type="text" id="student-id-input" maxlength="5" placeholder="예: 10101" class="w-full one-item px-6 py-4 text-center font-[900] text-[18px] outline-none border-2 border-transparent focus:border-[#007AFF] transition-colors mb-6">
-                <div class="flex gap-3">
-                    <button onclick="ui.closeLoginModal()" class="flex-1 py-4 bg-[#F2F2F7] rounded-full font-[800] text-[#5C5C5C] btn-press">취소</button>
-                    <button onclick="ui.processLogin()" class="flex-1 py-4 bg-[#007AFF] text-white rounded-full font-[800] btn-press">인증하기</button>
+    <div id="app" class="min-h-screen flex flex-col max-w-2xl mx-auto relative pb-32">
+        <!-- Header -->
+        <header class="sticky top-0 z-40 bg-[#F2F2F7]/90 backdrop-blur-xl px-6 pt-12 pb-4 flex items-center justify-between">
+            <h1 class="text-[30px] font-[900] tracking-tight">Duru</h1>
+            <div class="flex items-center gap-2">
+                <!-- Tester Button Added Here -->
+                <a href="/tester" class="btn-press flex items-center justify-center bg-white px-[12px] py-[6px] rounded-[100px] shadow-[0_2px_8px_rgba(0,0,0,0.05)]">
+                    <span class="text-[11px] font-[900] text-[#5C5C5C]">TESTER</span>
+                </a>
+                <div id="status-badge" class="live-badge">
+                    <div class="pulse-dot" id="main-dot"></div>
+                    <span class="text-[11px] font-[900] text-[#007AFF]" id="status-text">CONNECTING</span>
                 </div>
             </div>
+        </header>
+
+        <!-- Permission Error Message -->
+        <div id="permission-error" class="mx-5 mb-5 p-6 bg-red-50 border border-red-100 rounded-[24px]">
+            <h2 class="text-red-600 font-[900] mb-2">데이터 접근 권한 오류</h2>
+            <p class="text-red-500 text-sm font-[600] leading-relaxed">
+                Firebase 콘솔의 <b>Firestore Database -> Rules</b> 설정이 아래와 같이 되어 있는지 확인해 주세요:<br>
+                <code class="block mt-2 p-2 bg-red-100 rounded text-[12px]">allow read, write: if request.auth != null;</code>
+            </p>
         </div>
 
-        <!-- Global Confirm Modal -->
-        <div id="confirm-modal" class="fixed inset-0 z-[250] hidden modal-bg items-center justify-center p-6">
-            <div class="one-panel w-full max-w-xs p-8 animate-in zoom-in-95 duration-200">
-                <h3 id="confirm-title" class="text-[20px] font-[900] mb-2 text-center text-[#1D1D1F]">확인</h3>
-                <p id="confirm-desc" class="text-[14px] text-[#8E8E93] font-[600] text-center mb-8">설명이 표시됩니다.</p>
-                <div class="flex gap-3">
-                    <button onclick="ui.closeConfirm()" class="flex-1 py-3.5 bg-[#F2F2F7] rounded-full font-[800] text-[#5C5C5C] btn-press">취소</button>
-                    <button id="confirm-btn" class="flex-1 py-3.5 bg-[#FF3B30] text-white rounded-full font-[800] btn-press">확인</button>
-                </div>
+        <!-- Main Content Area -->
+        <main id="content" class="px-5 space-y-8 mt-4">
+            <div id="loading-view" class="py-20 text-center">
+                <div class="loader mx-auto mb-4"></div>
+                <p class="text-gray-400 font-[800]">서버 연결 중...</p>
             </div>
-        </div>
+        </main>
 
-        <!-- Admin Auth Modal -->
-        <div id="admin-modal" class="fixed inset-0 z-[200] hidden modal-bg items-center justify-center p-6">
-            <div class="one-panel w-full max-w-sm p-8 animate-in zoom-in-95 duration-200">
-                <h2 class="text-[22px] font-[900] mb-6 text-center">관리자 인증</h2>
-                <input type="password" id="admin-pw-input" placeholder="비밀번호" class="w-full one-item px-6 py-4 text-center font-[800] outline-none border-2 border-transparent focus:border-[#007AFF] mb-6">
-                <div class="flex gap-3">
-                    <button onclick="ui.closeAdminModal()" class="flex-1 py-4 bg-[#F2F2F7] rounded-full font-[800] text-[#5C5C5C] btn-press">취소</button>
-                    <button onclick="ui.verifyAdmin()" class="flex-1 py-4 bg-[#007AFF] text-white rounded-full font-[800] btn-press">확인</button>
-                </div>
-            </div>
-        </div>
-
-        <!-- Main Content -->
-        <div id="content" class="p-5 pt-12 mt-4 space-y-6"></div>
-
-        <!-- Floating UI Navigation (Shrinking on Scroll) -->
-        <div id="floating-bar" class="fixed left-1/2 -translate-x-1/2 bottom-6 w-[calc(100%-40px)] max-w-sm transition-all duration-500 z-50 hidden">
-            <nav class="bg-white/95 backdrop-blur-2xl shadow-[0_8px_40px_rgba(0,0,0,0.08)] rounded-[100px] flex items-center justify-between p-2 h-[76px] transition-all duration-500" id="nav-container">
-                <button onclick="router.navigate('home')" class="nav-btn nav-item flex-1 flex flex-col items-center justify-center h-full rounded-full btn-press relative transition-all text-gray-400" data-tab="home">
-                    <div class="relative z-10 flex items-center justify-center"><span class="material-symbols-rounded text-[24px]">home</span></div>
-                    <span class="nav-text text-[10px] font-[900] mt-1 relative z-10 transition-all duration-300">홈</span>
+        <!-- Floating UI Navigation -->
+        <div id="floating-bar" class="fixed left-1/2 -translate-x-1/2 bottom-6 w-[calc(100%-40px)] transition-all duration-500 z-50">
+            <nav class="bg-white/95 backdrop-blur-2xl shadow-[0_8px_40px_rgba(0,0,0,0.1)] rounded-[100px] flex items-center justify-between p-2 h-[76px] transition-all duration-500" id="nav-container">
+                <button onclick="setTab('home')" class="nav-item flex-1 flex flex-col items-center justify-center h-full rounded-full btn-press relative transition-all" id="btn-home">
+                    <div class="relative z-10"><svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg></div>
+                    <span class="nav-text text-[11px] font-[900] mt-1 relative z-10 transition-all duration-300">홈</span>
                 </button>
-                <button onclick="router.navigate('materials')" class="nav-btn nav-item flex-1 flex flex-col items-center justify-center h-full rounded-full btn-press relative transition-all text-gray-400" data-tab="materials">
-                    <div class="relative z-10 flex items-center justify-center"><span class="material-symbols-rounded text-[24px]">folder</span></div>
-                    <span class="nav-text text-[10px] font-[900] mt-1 relative z-10 transition-all duration-300">자료실</span>
+                <button onclick="setTab('time')" class="nav-item flex-1 flex flex-col items-center justify-center h-full rounded-full btn-press relative transition-all" id="btn-time">
+                    <div class="relative z-10"><svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg></div>
+                    <span class="nav-text text-[11px] font-[900] mt-1 relative z-10 transition-all duration-300">시간표</span>
                 </button>
-                <button onclick="router.navigate('exams')" class="nav-btn nav-item flex-1 flex flex-col items-center justify-center h-full rounded-full btn-press relative transition-all text-gray-400" data-tab="exams">
-                    <div class="relative z-10 flex items-center justify-center"><span class="material-symbols-rounded text-[24px]">quiz</span></div>
-                    <span class="nav-text text-[10px] font-[900] mt-1 relative z-10 transition-all duration-300">평가</span>
+                <button onclick="setTab('meal')" class="nav-item flex-1 flex flex-col items-center justify-center h-full rounded-full btn-press relative transition-all" id="btn-meal">
+                    <div class="relative z-10"><svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg></div>
+                    <span class="nav-text text-[11px] font-[900] mt-1 relative z-10 transition-all duration-300">급식</span>
                 </button>
-                <button onclick="ui.requireLoginAndNavigate('profile')" class="nav-btn nav-item flex-1 flex flex-col items-center justify-center h-full rounded-full btn-press relative transition-all text-gray-400" data-tab="profile">
-                    <div class="relative z-10 flex items-center justify-center"><span class="material-symbols-rounded text-[24px]">history</span></div>
-                    <span class="nav-text text-[10px] font-[900] mt-1 relative z-10 transition-all duration-300">내 기록</span>
+                <button onclick="setTab('class')" class="nav-item flex-1 flex flex-col items-center justify-center h-full rounded-full btn-press relative transition-all" id="btn-class">
+                    <div class="relative z-10"><svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 002-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg></div>
+                    <span class="nav-text text-[11px] font-[900] mt-1 relative z-10 transition-all duration-300">학급</span>
                 </button>
             </nav>
         </div>
+
+        <!-- Overlays -->
+        <div id="modal-container" class="fixed inset-0 z-[100] hidden modal-bg flex items-end md:items-center justify-center p-0 md:p-6"></div>
     </div>
 
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getFirestore, collection, addDoc, onSnapshot, doc, deleteDoc, updateDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-
-        const defaultConfig = {
-            apiKey: "AIzaSyDC6tQ3FMdYZ7uNUgLxKfOYELt8FEZ83bg",
-            authDomain: "durutester.firebaseapp.com",
-            projectId: "durutester",
-            storageBucket: "durutester.firebasestorage.app",
-            messagingSenderId: "1093780593477",
-            appId: "1:1093780593477:web:b7fdfdc6e099e7aedffc2c"
+    <script>
+        // --- 1. CONFIGURATION (사용자 제공 설정값) ---
+        const MY_CONFIG = {
+            apiKey: "AIzaSyAP8WRXAjmPdmATfWKnCrCRQNH0ftbBV9w",
+            authDomain: "duru108.firebaseapp.com",
+            projectId: "duru108",
+            storageBucket: "duru108.firebasestorage.app",
+            messagingSenderId: "669255987956",
+            appId: "1:669255987956:web:7479e73d084a2faafb24a1"
         };
 
-        let firebaseConfig = defaultConfig;
-        try {
-            if (typeof __firebase_config !== 'undefined' && __firebase_config) {
-                firebaseConfig = JSON.parse(__firebase_config);
-            }
-        } catch (e) {
-            console.error("Firebase config parse error", e);
+        const finalConfig = (typeof __firebase_config !== 'undefined' && __firebase_config) ? JSON.parse(__firebase_config) : MY_CONFIG;
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'duru-stable-v1';
+
+        // Firebase Setup
+        firebase.initializeApp(finalConfig);
+        const db = firebase.firestore();
+        const auth = firebase.auth();
+
+        let state = {
+            activeTab: 'home',
+            data: { 
+                announcements: [], schedules: [], materials: [], planner: [], 
+                memos: {}, meals: {}, timetables: {} 
+            },
+            dates: getDates(),
+            syncStarted: false
+        };
+
+        function getDates() {
+            const now = new Date();
+            const kst = new Date(now.getTime() + (9 * 60 * 60 * 1000));
+            const f = (d) => {
+                const year = d.getUTCFullYear();
+                const month = String(d.getUTCMonth() + 1).padStart(2, '0');
+                const date = String(d.getUTCDate()).padStart(2, '0');
+                return { str: `${year}-${month}-${date}` };
+            };
+            return { tdStr: f(kst).str, tmStr: f(new Date(kst.getTime() + 86400000)).str };
         }
 
-        const app = initializeApp(firebaseConfig);
-        const db = getFirestore(app);
-        const auth = getAuth(app);
-        const APP_ID = typeof __app_id !== 'undefined' ? __app_id : 'durutester';
+        // --- 2. AUTH & SYNC ENGINE ---
+        async function init() {
+            const statusText = document.getElementById('status-text');
+            const mainDot = document.getElementById('main-dot');
 
-        window.state = {
-            studentId: localStorage.getItem('duru_student_id') || '',
-            isAdmin: false,
-            
-            // 데이터 컬렉션
-            memos: [],
-            meals: [],
-            timetables: [],
-            materials: [],
-            exams: [], 
-            results: [],
-            
-            currentView: 'home',
-            titleClicks: 0,
-            
-            // 문제 풀이용 상태
-            currentExamId: null,
-            quizIndex: 0,
-            answers: [],
-            
-            viewingResultId: null,
-            isDataLoaded: false,
-            pendingAction: null // 로그인 완료 후 실행할 함수 보관용
-        };
-
-        const getCol = (name) => collection(db, 'artifacts', APP_ID, 'public', 'data', name);
-
-        window.ui = {
-            showToast: (msg) => {
-                const t = document.getElementById('toast');
-                if(!t) return;
-                t.innerText = msg;
-                t.classList.add('toast-active');
-                setTimeout(() => t.classList.remove('toast-active'), 2500);
-            },
-            hideLoading: () => {
-                const l = document.getElementById('loading');
-                if (l) {
-                    l.classList.add('opacity-0');
-                    setTimeout(() => l.classList.add('hidden'), 500);
+            try {
+                // RULE 3: Auth Before Queries - 익명 인증 시도 및 확인
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await auth.signInWithCustomToken(__initial_auth_token);
+                } else if (!auth.currentUser) {
+                    await auth.signInAnonymously();
                 }
-            },
-            openConfirm: (title, desc, onConfirm) => {
-                const m = document.getElementById('confirm-modal');
-                document.getElementById('confirm-title').innerText = title;
-                document.getElementById('confirm-desc').innerText = desc;
-                const btn = document.getElementById('confirm-btn');
-                btn.onclick = () => { onConfirm(); ui.closeConfirm(); };
-                m.classList.replace('hidden', 'flex');
-            },
-            closeConfirm: () => document.getElementById('confirm-modal').classList.replace('flex', 'hidden'),
-            
-            // 로그인 관련 (모달 띄우기)
-            requireLoginAndNavigate: (targetView) => {
-                if (window.state.studentId) {
-                    router.navigate(targetView);
-                } else {
-                    window.state.pendingAction = () => router.navigate(targetView);
-                    document.getElementById('login-modal').classList.replace('hidden', 'flex');
-                }
-            },
-            requireLoginToStartQuiz: (examId) => {
-                if (window.state.studentId) {
-                    ui.startQuiz(examId);
-                } else {
-                    window.state.pendingAction = () => ui.startQuiz(examId);
-                    document.getElementById('login-modal').classList.replace('hidden', 'flex');
-                }
-            },
-            closeLoginModal: () => {
-                document.getElementById('login-modal').classList.replace('flex', 'hidden');
-                window.state.pendingAction = null;
-            },
-            processLogin: () => {
-                const id = document.getElementById('student-id-input').value;
-                if (id.length === 5 && /^\d+$/.test(id)) {
-                    window.state.studentId = id;
-                    localStorage.setItem('duru_student_id', id);
-                    ui.showToast(`${id}님 확인되었습니다.`);
-                    ui.closeLoginModal();
-                    if (window.state.pendingAction) window.state.pendingAction();
-                } else {
-                    ui.showToast("학번 5자리를 정확히 입력하세요.");
-                }
-            },
-            logout: () => {
-                ui.openConfirm("로그아웃", "로그아웃 하시겠습니까? (응시 기록은 보존됩니다)", () => {
-                    window.state.studentId = '';
-                    localStorage.removeItem('duru_student_id');
-                    ui.showToast("로그아웃 되었습니다.");
-                    router.navigate('home');
-                });
-            },
 
-            // 관리자 관련
-            handleTitleClick: () => {
-                window.state.titleClicks++;
-                if (window.state.titleClicks >= 5) {
-                    document.getElementById('admin-modal').classList.replace('hidden', 'flex');
-                    window.state.titleClicks = 0;
-                }
-                setTimeout(() => window.state.titleClicks = 0, 3000);
-            },
-            closeAdminModal: () => document.getElementById('admin-modal').classList.replace('flex', 'hidden'),
-            verifyAdmin: () => {
-                if (document.getElementById('admin-pw-input').value === 'admin123') {
-                    window.state.isAdmin = true;
-                    ui.closeAdminModal();
-                    ui.showToast("관리자 모드 활성화");
-                    router.navigate('admin_manage');
-                } else {
-                    ui.showToast("비밀번호 오류");
-                }
-            },
-            
-            // 관리자 - 데이터 추가 로직
-            addGeneralContent: async () => {
-                const type = document.getElementById('content-type').value;
-                const v1 = document.getElementById('content-v1').value.trim();
-                const v2 = document.getElementById('content-v2').value.trim();
-
-                if (!v1) return ui.showToast("주요 내용을 입력해주세요.");
-
-                try {
-                    if (type === 'memos') {
-                        await addDoc(getCol('memos'), { content: v1, createdAt: serverTimestamp() });
-                    } else if (type === 'meals') {
-                        await addDoc(getCol('meals'), { menu: v1, createdAt: serverTimestamp() });
-                    } else if (type === 'timetables') {
-                        await addDoc(getCol('timetables'), { periods: v1.split(',').map(s=>s.trim()), createdAt: serverTimestamp() });
-                    } else if (type === 'materials') {
-                        if (!v2) return ui.showToast("자료 링크를 입력해주세요.");
-                        await addDoc(getCol('materials'), { title: v1, link: v2, createdAt: serverTimestamp() });
-                    }
-                    document.getElementById('content-v1').value = '';
-                    document.getElementById('content-v2').value = '';
-                    ui.showToast("추가 완료!");
-                } catch(e) {
-                    ui.showToast("오류가 발생했습니다.");
-                }
-            },
-            deleteItem: (colName, id) => {
-                ui.openConfirm("삭제 확인", "이 항목을 삭제하시겠습니까?", async () => {
-                    await deleteDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', colName, id));
-                    ui.showToast("삭제 완료");
-                });
-            },
-            addExam: async () => {
-                const title = document.getElementById('exam-title-input').value.trim();
-                const text = document.getElementById('json-input').value;
-                if(!title) return ui.showToast("시험 제목을 입력해주세요.");
-                if(!text) return ui.showToast("JSON 데이터를 입력해주세요.");
-                try {
-                    const data = JSON.parse(text);
-                    const questions = Array.isArray(data) ? data : [data];
-                    await addDoc(getCol('exams'), { title: title, questions: questions, createdAt: serverTimestamp() });
-                    document.getElementById('exam-title-input').value = '';
-                    document.getElementById('json-input').value = '';
-                    ui.showToast(`[${title}] 등록 완료!`);
-                } catch (e) {
-                    ui.showToast("등록 실패: JSON 형식을 확인해주세요.");
-                }
-            },
-
-            // 퀴즈 관련
-            startQuiz: (examId) => {
-                const exam = window.state.exams.find(e => e.id === examId);
-                if (!exam || exam.questions.length === 0) return ui.showToast("문제가 없습니다.");
-                window.state.currentExamId = examId;
-                window.state.quizIndex = 0;
-                window.state.answers = [];
-                router.navigate('solving');
-            },
-            selectOption: (val) => {
-                window.state.answers[window.state.quizIndex] = val;
-                ui.render();
-            },
-            nextQuestion: () => {
-                const exam = window.state.exams.find(e => e.id === window.state.currentExamId);
-                if (window.state.quizIndex < exam.questions.length - 1) {
-                    window.state.quizIndex++;
-                    ui.render();
-                } else {
-                    ui.submitExam();
-                }
-            },
-            submitExam: async () => {
-                const exam = window.state.exams.find(e => e.id === window.state.currentExamId);
-                let score = 0;
-                const examSnapshot = exam.questions.map(q => ({
-                    question: q.question, options: q.options, answer: q.answer, explanations: q.explanations || []
-                }));
-
-                exam.questions.forEach((q, i) => { 
-                    if (window.state.answers[i] !== undefined && Number(q.answer) === Number(window.state.answers[i])) score++; 
-                });
-                const finalScore = Math.round((score / exam.questions.length) * 100);
-                
-                try {
-                    const docRef = await addDoc(getCol('results'), {
-                        studentId: window.state.studentId,
-                        examId: exam.id,
-                        examTitle: exam.title,
-                        score: finalScore,
-                        answers: window.state.answers,
-                        questionsSnapshot: examSnapshot,
-                        timestamp: serverTimestamp()
-                    });
-                    window.state.viewingResultId = docRef.id;
-                    ui.showToast("수고하셨습니다. 제출 완료!");
-                    router.navigate('result_detail');
-                } catch(e) {
-                    ui.showToast("기록 저장 중 오류가 발생했습니다.");
-                }
-            },
-            viewPastResult: (resultId) => {
-                window.state.viewingResultId = resultId;
-                router.navigate('result_detail');
-            },
-
-            // 렌더링
-            render: () => {
-                const content = document.getElementById('content');
-                const nav = document.getElementById('floating-bar');
-                if (!content || !nav) return;
-
-                const isFullScreenView = ['solving', 'result_detail'].includes(window.state.currentView);
-                nav.classList.toggle('hidden', isFullScreenView || window.state.isAdmin);
-
-                document.querySelectorAll('.nav-btn').forEach(btn => {
-                    const active = btn.dataset.tab === window.state.currentView;
-                    if(active) {
-                        btn.classList.add('nav-active');
-                        btn.classList.replace('text-gray-400', 'text-black');
+                // 인증 상태 리스너
+                auth.onAuthStateChanged(user => {
+                    if (user) {
+                        statusText.innerText = "LIVE";
+                        mainDot.style.backgroundColor = "#007AFF";
+                        // 인증 완료된 후 최초 1회만 데이터 구독 시작
+                        if (!state.syncStarted) {
+                            state.syncStarted = true;
+                            startSync(user);
+                        }
                     } else {
-                        btn.classList.remove('nav-active');
-                        btn.classList.replace('text-black', 'text-gray-400');
+                        statusText.innerText = "AUTHENTICATING...";
+                        mainDot.style.backgroundColor = "#FF9500";
                     }
                 });
+            } catch (e) {
+                statusText.innerText = "AUTH ERROR";
+                mainDot.style.backgroundColor = "#FF3B30";
+                console.error("Auth Exception:", e);
+            }
+            render();
+        }
 
-                if (window.state.currentView === 'home') {
-                    const latestMemo = window.state.memos.sort((a,b)=>b.createdAt-a.createdAt)[0];
-                    const latestMeal = window.state.meals.sort((a,b)=>b.createdAt-a.createdAt)[0];
-                    const latestTime = window.state.timetables.sort((a,b)=>b.createdAt-a.createdAt)[0];
+        function startSync(user) {
+            // RULE 1: Strict Paths
+            const pub = (col) => db.collection('artifacts').doc(appId).collection('public').doc('data').collection(col);
+            const priv = (col) => db.collection('artifacts').doc(appId).collection('users').doc(user.uid).collection(col);
 
-                    content.innerHTML = `
-                        <div class="flex justify-between items-center mb-2 px-2" onclick="ui.handleTitleClick()">
-                            <div>
-                                <h1 class="text-[28px] font-[900] tracking-tight text-[#1D1D1F] leading-tight">Duru</h1>
-                                <p class="text-[#8E8E93] text-[12px] font-[800] tracking-widest uppercase">Smart Class</p>
-                            </div>
-                            <div class="w-12 h-12 bg-white shadow-sm text-[#007AFF] rounded-[16px] flex items-center justify-center">
-                                <span class="material-symbols-rounded text-2xl">school</span>
-                            </div>
-                        </div>
-
-                        <!-- Notice/Memo -->
-                        <div class="one-panel p-6 bg-[#1D1D1F] text-white">
-                            <div class="flex items-center gap-2 mb-4">
-                                <span class="material-symbols-rounded text-[#007AFF]">campaign</span>
-                                <h3 class="text-[14px] font-[900]">학급 공지사항</h3>
-                            </div>
-                            <p class="font-[800] text-[16px] leading-relaxed break-keep">
-                                ${latestMemo ? latestMemo.content : '현재 등록된 공지사항이 없습니다.'}
-                            </p>
-                        </div>
-
-                        <!-- Meals & Timetable Grid -->
-                        <div class="grid grid-cols-2 gap-4">
-                            <div class="one-panel p-5">
-                                <h3 class="text-[12px] font-[900] text-[#8E8E93] mb-3 flex items-center gap-1"><span class="material-symbols-rounded text-[16px] text-[#FF9500]">restaurant</span> 오늘의 급식</h3>
-                                <p class="text-[14px] font-[800] leading-snug break-keep text-[#1D1D1F]">
-                                    ${latestMeal ? latestMeal.menu.replace(/,/g, '<br>') : '급식 정보 없음'}
-                                </p>
-                            </div>
-                            <div class="one-panel p-5">
-                                <h3 class="text-[12px] font-[900] text-[#8E8E93] mb-3 flex items-center gap-1"><span class="material-symbols-rounded text-[16px] text-[#34C759]">calendar_month</span> 시간표</h3>
-                                <ul class="text-[13px] font-[800] text-[#1D1D1F] space-y-1.5">
-                                    ${latestTime && latestTime.periods.length > 0 
-                                        ? latestTime.periods.map((p, i) => `<li><span class="text-[#8E8E93] mr-2">${i+1}</span>${p}</li>`).join('') 
-                                        : '<li>정보 없음</li>'}
-                                </ul>
-                            </div>
-                        </div>
-
-                        <!-- Mini Banner for Exams -->
-                        <div class="one-panel p-6 bg-gradient-to-r from-[#E5F1FF] to-white flex justify-between items-center btn-press" onclick="router.navigate('exams')">
-                            <div>
-                                <p class="text-[#007AFF] font-[900] text-[11px] mb-1 uppercase">EXAM CENTER</p>
-                                <p class="font-[900] text-[16px] text-[#1D1D1F]">현재 ${window.state.exams.length}개의 시험 진행중</p>
-                            </div>
-                            <span class="material-symbols-rounded text-[#007AFF]">arrow_forward_ios</span>
-                        </div>
-                    `;
-                } else if (window.state.currentView === 'materials') {
-                    content.innerHTML = `
-                        <h2 class="text-[26px] font-[900] mb-6 px-2">학습 자료실</h2>
-                        <div class="space-y-3">
-                            ${window.state.materials.length === 0 ? `
-                                <div class="one-panel py-16 text-center">
-                                    <p class="text-[#8E8E93] font-[800]">등록된 자료가 없습니다.</p>
-                                </div>
-                            ` : window.state.materials.map(m => `
-                                <a href="${m.link}" target="_blank" class="block one-panel p-5 btn-press">
-                                    <div class="flex items-center gap-4">
-                                        <div class="w-12 h-12 one-item flex items-center justify-center text-[#FF2D55]">
-                                            <span class="material-symbols-rounded">picture_as_pdf</span>
-                                        </div>
-                                        <div class="flex-1 overflow-hidden">
-                                            <p class="font-[900] text-[#1D1D1F] text-[16px] truncate">${m.title}</p>
-                                            <p class="text-[11px] text-[#8E8E93] font-[800] truncate mt-1">${m.link}</p>
-                                        </div>
-                                        <span class="material-symbols-rounded text-[#C7C7CC]">open_in_new</span>
-                                    </div>
-                                </a>
-                            `).join('')}
-                        </div>
-                    `;
-                } else if (window.state.currentView === 'exams') {
-                    content.innerHTML = `
-                        <h2 class="text-[26px] font-[900] mb-6 px-2">평가 센터</h2>
-                        <div class="space-y-4">
-                            ${window.state.exams.length === 0 ? `
-                                <div class="one-panel py-16 text-center">
-                                    <p class="text-[#8E8E93] font-[800]">현재 진행 중인 시험이 없습니다.</p>
-                                </div>
-                            ` : window.state.exams.map(exam => `
-                                <div class="one-panel p-7 border border-transparent hover:border-[#007AFF]/20 transition-all">
-                                    <div class="flex justify-between items-start mb-5">
-                                        <div>
-                                            <span class="inline-block px-3 py-1 bg-[#E5F1FF] text-[#007AFF] text-[10px] font-[900] rounded-full mb-2">TEST</span>
-                                            <h3 class="font-[900] text-[#1D1D1F] text-[20px] leading-tight break-keep">${exam.title}</h3>
-                                        </div>
-                                        <div class="w-10 h-10 one-item flex items-center justify-center text-[#007AFF]">
-                                            <span class="material-symbols-rounded text-[20px]">description</span>
-                                        </div>
-                                    </div>
-                                    <div class="flex items-center gap-4 text-[12px] font-[800] text-[#8E8E93] mb-6">
-                                        <span class="flex items-center gap-1"><span class="material-symbols-rounded text-[14px]">format_list_numbered</span> ${exam.questions.length}문항</span>
-                                        <span class="flex items-center gap-1"><span class="material-symbols-rounded text-[14px]">schedule</span> 시간 무제한</span>
-                                    </div>
-                                    <button onclick="ui.requireLoginToStartQuiz('${exam.id}')" class="w-full bg-[#1D1D1F] text-white py-4 rounded-full font-[900] text-[15px] shadow-md btn-press">
-                                        시험 응시하기
-                                    </button>
-                                </div>
-                            `).join('')}
-                        </div>
-                    `;
-                } else if (window.state.currentView === 'solving') {
-                    const exam = window.state.exams.find(e => e.id === window.state.currentExamId);
-                    const q = exam.questions[window.state.quizIndex];
-                    if(!q) return router.navigate('home');
-                    
-                    content.innerHTML = `
-                        <div class="flex flex-col items-center gap-2 mb-2">
-                            <p class="text-[11px] font-[900] text-[#007AFF] uppercase tracking-widest">${exam.title}</p>
-                            <div class="flex justify-between w-full items-center">
-                                <span class="bg-[#E5F1FF] text-[#007AFF] px-4 py-1.5 rounded-full text-[12px] font-[900] uppercase">Q. ${window.state.quizIndex + 1} / ${exam.questions.length}</span>
-                                <button onclick="router.navigate('exams')" class="text-[#8E8E93] btn-press"><span class="material-symbols-rounded">close</span></button>
-                            </div>
-                        </div>
-                        <div class="one-panel p-8 min-h-[160px] flex items-center">
-                            <h2 class="text-[18px] font-[800] leading-relaxed tracking-tight break-keep text-[#1D1D1F]">${q.question}</h2>
-                        </div>
-                        <div class="space-y-3">
-                            ${q.options.map((opt, i) => `
-                                <button onclick="ui.selectOption(${i})" class="w-full p-5 rounded-[24px] text-left btn-press flex items-center gap-4 ${window.state.answers[window.state.quizIndex] === i ? 'bg-[#007AFF] text-white shadow-lg' : 'bg-white text-[#5C5C5C] shadow-[0_4px_20px_rgba(0,0,0,0.02)]'}">
-                                    <span class="w-8 h-8 rounded-full flex items-center justify-center text-[14px] font-[900] ${window.state.answers[window.state.quizIndex] === i ? 'bg-white/20 text-white' : 'bg-[#F2F2F7] text-[#8E8E93]'}">${i + 1}</span>
-                                    <span class="font-[800] text-[15px] leading-snug">${opt}</span>
-                                </button>
-                            `).join('')}
-                        </div>
-                        <button onclick="ui.nextQuestion()" ${window.state.answers[window.state.quizIndex] === undefined ? 'disabled' : ''} 
-                            class="w-full bg-[#007AFF] text-white py-5 rounded-[32px] font-[900] text-[17px] shadow-lg disabled:opacity-30 disabled:scale-100 btn-press mt-6">
-                            ${window.state.quizIndex === exam.questions.length - 1 ? '제출하고 채점하기' : '다음 문제'}
-                        </button>
-                    `;
-                } else if (window.state.currentView === 'result_detail') {
-                    const res = window.state.results.find(r => r.id === window.state.viewingResultId);
-                    if (!res) {
-                        content.innerHTML = `<p class="text-center py-20 text-[#8E8E93] font-[800]">기록을 불러오는 중이거나 찾을 수 없습니다.</p>`;
-                        return;
-                    }
-                    const qs = res.questionsSnapshot || [];
-                    content.innerHTML = `
-                        <div class="flex items-center gap-4 mb-4">
-                            <button onclick="router.navigate('profile')" class="text-[#8E8E93] btn-press"><span class="material-symbols-rounded">arrow_back</span></button>
-                            <span class="font-[900] text-[#1D1D1F] text-[18px]">상세 결과 및 해설</span>
-                        </div>
-                        <div class="one-panel p-8 text-center bg-gradient-to-br from-[#E5F1FF] to-white mb-8">
-                            <p class="text-[#007AFF] font-[900] text-[11px] uppercase tracking-widest mb-2">${res.examTitle || '시험 결과'}</p>
-                            <h2 class="text-[64px] font-[900] text-[#007AFF] leading-none mb-2">${res.score}<span class="text-[20px]">점</span></h2>
-                            <p class="text-[#8E8E93] text-[12px] font-[800]">${res.timestamp?.toDate().toLocaleString() || '최근'}</p>
-                        </div>
-                        <div class="space-y-6">
-                            ${qs.map((q, i) => {
-                                const userAns = res.answers[i];
-                                const correctAns = Number(q.answer);
-                                const isCorrect = userAns !== undefined && Number(userAns) === correctAns;
-                                
-                                return `
-                                <div class="one-panel p-6 border-l-[6px] ${isCorrect ? 'border-[#34C759]' : 'border-[#FF3B30]'}">
-                                    <div class="flex gap-3 items-start mb-4">
-                                        <span class="text-[14px] font-[900] ${isCorrect ? 'text-[#34C759]' : 'text-[#FF3B30]'}">Q${i+1}</span>
-                                        <p class="font-[800] text-[16px] text-[#1D1D1F] leading-snug">${q.question}</p>
-                                    </div>
-                                    <div class="one-item p-5 text-[14px] leading-relaxed text-[#5C5C5C]">
-                                        <div class="flex items-center gap-2 mb-2">
-                                            <span class="material-symbols-rounded text-[20px] ${isCorrect ? 'text-[#34C759]' : 'text-[#FF3B30]'}">${isCorrect ? 'check_circle' : 'cancel'}</span>
-                                            <p class="font-[800]">내 선택: ${userAns !== undefined && q.options[userAns] ? q.options[userAns] : '미선택'}</p>
-                                        </div>
-                                        ${!isCorrect ? `<p class="mb-4 text-[#8E8E93] font-[600]">정답: <span class="text-[#1D1D1F] font-[900] underline decoration-[#007AFF]/30 decoration-4 underline-offset-4">${q.options[correctAns] || '데이터 없음'}</span></p>` : ''}
-                                        
-                                        <hr class="my-4 border-[#E5E5EA]">
-                                        
-                                        <div class="flex flex-col gap-2">
-                                            <span class="text-[12px] font-[900] text-[#007AFF] shrink-0">📝 전체 해설 (답지)</span>
-                                            <div class="text-[13px] text-[#5C5C5C] break-keep leading-relaxed space-y-2 bg-white p-4 rounded-[16px] border border-[#E5E5EA]">
-                                                ${Array.isArray(q.explanations)
-                                                    ? q.explanations.map((exp, idx) => `
-                                                        <p class="${idx === correctAns ? 'text-[#007AFF] font-[800] bg-[#E5F1FF] p-2 rounded-[12px]' : 'font-[600] p-1'}">
-                                                            [${idx + 1}번] ${exp}
-                                                        </p>
-                                                    `).join('')
-                                                    : `<p class="font-[600]">${q.explanations || '등록된 해설이 없습니다.'}</p>`
-                                                }
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                                `;
-                            }).join('')}
-                        </div>
-                        <button onclick="router.navigate('profile')" class="w-full bg-[#1D1D1F] text-white py-5 rounded-[32px] font-[900] text-[17px] shadow-xl btn-press mt-8">닫기 (기록실로 이동)</button>
-                    `;
-                } else if (window.state.currentView === 'profile') {
-                    const myResults = window.state.results
-                        .filter(r => r.studentId === window.state.studentId)
-                        .sort((a,b) => {
-                            if(!a.timestamp) return -1;
-                            if(!b.timestamp) return 1;
-                            return b.timestamp.seconds - a.timestamp.seconds;
-                        });
-                    const myBest = [...myResults].sort((a,b) => b.score - a.score)[0];
-
-                    content.innerHTML = `
-                        <div class="flex justify-between items-center mb-6 px-2">
-                            <h2 class="text-[26px] font-[900]">나의 학습 기록</h2>
-                            <button onclick="ui.logout()" class="text-[#FF3B30] font-[800] text-[12px] bg-[#FF3B30]/10 px-4 py-2 rounded-full btn-press">학번 리셋</button>
-                        </div>
-                        
-                        <div class="grid grid-cols-2 gap-4 mb-8">
-                            <div class="one-panel p-6 bg-[#007AFF] text-white">
-                                <p class="text-[11px] font-[800] text-blue-200 uppercase mb-1">최고 달성 점수</p>
-                                <p class="text-[32px] font-[900]">${myBest ? myBest.score : '0'}<span class="text-[16px] ml-1 text-blue-200">점</span></p>
-                            </div>
-                            <div class="one-panel p-6">
-                                <p class="text-[11px] font-[800] text-[#8E8E93] uppercase mb-1">누적 응시 횟수</p>
-                                <p class="text-[32px] font-[900] text-[#1D1D1F]">${myResults.length}<span class="text-[16px] ml-1 text-[#8E8E93]">회</span></p>
-                            </div>
-                        </div>
-
-                        <div class="space-y-4">
-                            <h3 class="text-[14px] font-[900] text-[#8E8E93] px-2 mb-2">과거 응시 내역</h3>
-                            ${myResults.length === 0 ? `
-                                <div class="one-item py-16 text-center border-2 border-dashed border-[#E5E5EA]">
-                                    <span class="material-symbols-rounded text-[#C7C7CC] text-[48px] mb-2">history</span>
-                                    <p class="text-[#8E8E93] text-[14px] font-[800]">아직 응시한 기록이 없습니다.</p>
-                                </div>
-                            ` : myResults.map((r, i) => `
-                                <button onclick="ui.viewPastResult('${r.id}')" class="w-full one-panel p-6 flex justify-between items-center btn-press text-left border-2 border-transparent active:border-[#007AFF]/20">
-                                    <div class="flex items-center gap-4">
-                                        <div class="w-12 h-12 rounded-[16px] bg-[#E5F1FF] flex flex-col items-center justify-center text-[#007AFF]">
-                                            <span class="text-[9px] font-[900] uppercase leading-none mb-1">SCORE</span>
-                                            <span class="font-[900] text-[16px] leading-none">${r.score}</span>
-                                        </div>
-                                        <div>
-                                            <p class="font-[900] text-[16px] text-[#1D1D1F] leading-tight">${r.examTitle || '이전 모의고사'}</p>
-                                            <p class="text-[11px] text-[#8E8E93] font-[800] uppercase mt-1">${r.timestamp?.toDate().toLocaleString() || '방금 전'}</p>
-                                        </div>
-                                    </div>
-                                    <div class="text-[#C7C7CC]">
-                                        <span class="material-symbols-rounded">chevron_right</span>
-                                    </div>
-                                </button>
-                            `).join('')}
-                        </div>
-                    `;
-                } else if (window.state.currentView === 'admin_manage') {
-                    content.innerHTML = `
-                        <div class="flex justify-between items-center mb-6">
-                            <h2 class="text-[24px] font-[900]">Admin Console</h2>
-                            <button onclick="window.state.isAdmin=false; router.navigate('home')" class="text-[#8E8E93] btn-press"><span class="material-symbols-rounded">logout</span></button>
-                        </div>
-                        
-                        <!-- 클래스 기본 정보 관리 -->
-                        <div class="one-panel p-6 mb-8 border border-[#E5E5EA]">
-                            <h3 class="text-[14px] font-[900] text-[#1D1D1F] mb-4">공지 / 급식 / 시간표 / 자료 추가</h3>
-                            <select id="content-type" class="w-full one-item p-4 text-[14px] font-[800] outline-none border-2 border-transparent focus:border-[#007AFF] mb-3">
-                                <option value="memos">학급 공지사항 (Memo)</option>
-                                <option value="meals">오늘의 급식 (Meal)</option>
-                                <option value="timetables">시간표 (Timetable - 쉼표 구분)</option>
-                                <option value="materials">학습 자료 (Material)</option>
-                            </select>
-                            <input type="text" id="content-v1" placeholder="주요 내용 (메뉴, 공지, 파일명 등)" class="w-full one-item p-4 text-[14px] font-[800] outline-none border-2 border-transparent focus:border-[#007AFF] mb-3">
-                            <input type="text" id="content-v2" placeholder="보조 내용 (자료 링크 등 - 자료실만 사용)" class="w-full one-item p-4 text-[14px] font-[800] outline-none border-2 border-transparent focus:border-[#007AFF] mb-4">
-                            <button onclick="ui.addGeneralContent()" class="w-full bg-[#1D1D1F] text-white py-4 rounded-full font-[900] text-[15px] shadow-lg btn-press">클래스 정보 추가</button>
-                        </div>
-
-                        <!-- 시험 관리 -->
-                        <div class="one-panel p-6 mb-8 border border-[#E5F1FF]">
-                            <h3 class="text-[14px] font-[900] text-[#007AFF] mb-4">새 시험 등록 (JSON)</h3>
-                            <input type="text" id="exam-title-input" placeholder="시험 제목 (예: 제 1회 모의고사)" class="w-full one-item p-4 text-[14px] font-[800] outline-none border-2 border-transparent focus:border-[#007AFF] mb-3">
-                            <textarea id="json-input" placeholder='[{"question": "...", "options": [...], "answer": 0, "explanations": [...]}]' 
-                                class="w-full h-32 one-item p-4 text-[12px] font-mono outline-none border-2 border-transparent focus:border-[#007AFF] mb-4"></textarea>
-                            <button onclick="ui.addExam()" class="w-full bg-[#007AFF] text-white py-4 rounded-full font-[900] text-[15px] shadow-lg btn-press">시험 생성하기</button>
-                        </div>
-
-                        <!-- 등록된 데이터 리스트 요약 -->
-                        <div class="space-y-6">
-                            <div>
-                                <h3 class="text-[14px] font-[900] text-[#8E8E93] px-2 mb-2">등록된 시험 (${window.state.exams.length})</h3>
-                                ${window.state.exams.map(exam => `
-                                    <div class="one-panel p-5 mb-3 flex justify-between items-center">
-                                        <div class="flex-1 overflow-hidden pr-2">
-                                            <p class="font-[900] text-[#1D1D1F] truncate">${exam.title}</p>
-                                            <p class="text-[11px] text-[#8E8E93] font-[800]">총 ${exam.questions.length}문항</p>
-                                        </div>
-                                        <button onclick="ui.deleteItem('exams', '${exam.id}')" class="text-[#FF3B30] bg-[#FF3B30]/10 p-2 rounded-full btn-press"><span class="material-symbols-rounded text-sm">delete</span></button>
-                                    </div>
-                                `).join('')}
-                            </div>
-                            
-                            <div>
-                                <h3 class="text-[14px] font-[900] text-[#8E8E93] px-2 mb-2">학생 성적 (${window.state.results.length})</h3>
-                                ${window.state.results.map(r => `
-                                    <div class="one-panel p-5 mb-3 flex justify-between items-center">
-                                        <div><span class="font-[900] mr-2">${r.studentId}</span> <span class="text-[#007AFF] font-[900]">${r.score}점</span></div>
-                                        <button onclick="ui.deleteItem('results', '${r.id}')" class="text-[#8E8E93] p-1"><span class="material-symbols-rounded text-sm">delete</span></button>
-                                    </div>
-                                `).join('')}
-                            </div>
-
-                            <div>
-                                <h3 class="text-[14px] font-[900] text-[#8E8E93] px-2 mb-2">자료실 링크 (${window.state.materials.length})</h3>
-                                ${window.state.materials.map(m => `
-                                    <div class="one-panel p-5 mb-3 flex justify-between items-center">
-                                        <p class="font-[900] text-[#1D1D1F] truncate flex-1">${m.title}</p>
-                                        <button onclick="ui.deleteItem('materials', '${m.id}')" class="text-[#FF3B30] bg-[#FF3B30]/10 p-2 rounded-full btn-press"><span class="material-symbols-rounded text-sm">delete</span></button>
-                                    </div>
-                                `).join('')}
-                            </div>
-                        </div>
-                    `;
+            const handleError = (colName) => (err) => {
+                console.error(`Sync Error [${colName}]:`, err.message);
+                if (err.code === 'permission-denied') {
+                    document.getElementById('permission-error').style.display = 'block';
+                    document.getElementById('status-text').innerText = "RESTRICTED";
                 }
-            }
-        };
+            };
 
-        window.router = {
-            navigate: (view) => {
-                window.state.currentView = view;
-                window.scrollTo(0,0);
-                ui.render();
-            }
-        };
+            // 데이터 실시간 감시 시작
+            pub('announcements').onSnapshot(s => { 
+                state.data.announcements = s.docs.map(d=>({id:d.id, ...d.data()})).sort((a,b)=>b.at-a.at); 
+                render(); 
+            }, handleError('announcements'));
 
-        // Scroll listener for floating bar (Duru Style)
+            pub('schedules').onSnapshot(s => { 
+                state.data.schedules = s.docs.map(d=>({id:d.id, ...d.data()})).sort((a,b)=>new Date(a.date)-new Date(b.date)); 
+                render(); 
+            }, handleError('schedules'));
+
+            pub('materials').onSnapshot(s => { 
+                state.data.materials = s.docs.map(d=>({id:d.id, ...d.data()})).sort((a,b)=>b.at-a.at); 
+                render(); 
+            }, handleError('materials'));
+
+            pub('memos').onSnapshot(s => { 
+                s.docs.forEach(d=>state.data.memos[d.id]=d.data().content); 
+                render(); 
+            }, handleError('memos'));
+
+            pub('meals').onSnapshot(s => { 
+                s.docs.forEach(d=>state.data.meals[d.id]=d.data().menu); 
+                render(); 
+            }, handleError('meals'));
+
+            pub('timetables').onSnapshot(s => { 
+                s.docs.forEach(d=>state.data.timetables[d.id]=d.data().periods); 
+                render(); 
+            }, handleError('timetables'));
+
+            priv('planner').onSnapshot(s => { 
+                state.data.planner = s.docs.map(d=>({id:d.id, ...d.data()})).sort((a,b)=>b.at-a.at); 
+                render(); 
+            }, handleError('planner'));
+        }
+
+        // --- 3. UI RENDERING ---
+        function setTab(tab) {
+            state.activeTab = tab;
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+            render();
+        }
+
+        function render() {
+            const container = document.getElementById('content');
+            if (!container) return;
+            const tab = state.activeTab;
+
+            document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('nav-active'));
+            const btn = document.getElementById(`btn-${tab}`);
+            if (btn) btn.classList.add('nav-active');
+
+            let html = '';
+            if (tab === 'home') html = renderHome();
+            else if (tab === 'time') html = renderTime();
+            else if (tab === 'meal') html = renderMeal();
+            else if (tab === 'class') html = renderClass();
+
+            container.innerHTML = html;
+        }
+
+        function renderHome() {
+            const meal = state.data.meals[state.dates.tdStr];
+            const nextEvt = (state.data.schedules || []).filter(s => new Date(s.date) >= new Date(state.dates.tdStr))[0];
+
+            return `
+                <div class="one-panel p-8">
+                    <div class="flex justify-between items-center mb-6"><h2 class="font-[900] text-[24px]">학급 알림</h2><button onclick="openInputModal('NOTICE')" class="btn-press text-[#007AFF] font-[900] text-sm bg-[#F2F2F7] px-4 py-2 rounded-full">작성</button></div>
+                    <div class="space-y-4">${(state.data.announcements || []).length ? state.data.announcements.slice(0,2).map(a => `
+                        <div class="one-item p-6 border border-white shadow-sm">
+                            <h3 class="font-[900] text-[17px]">${a.title || '제목 없음'}</h3>
+                            <p class="text-[14px] text-[#5C5C5C] mt-2 font-[600] leading-relaxed">${a.content || '내용 없음'}</p>
+                        </div>
+                    `).join('') : '<p class="text-center text-gray-400 py-6 font-[600]">새로운 공지사항이 없습니다.</p>'}</div>
+                </div>
+                <div class="one-panel p-8 text-center bg-gradient-to-br from-[#007AFF]/10 to-white min-h-[140px] flex flex-col justify-center">
+                    <p class="text-[12px] font-[900] text-[#007AFF] mb-1 tracking-widest uppercase">다가오는 일정</p>
+                    <div class="font-[900] text-[22px] text-[#1D1D1F]">${nextEvt ? nextEvt.title : '등록된 일정 없음'}</div>
+                    ${nextEvt ? `<p class="text-[13px] font-[800] text-[#8E8E93] mt-1">${nextEvt.date}</p>` : ''}
+                </div>
+                <div class="one-panel p-8">
+                    <div class="flex justify-between items-center mb-6"><h3 class="font-[900] text-[22px]">오늘의 점심 🍱</h3><button onclick="openInputModal('MEAL', '${state.dates.tdStr}')" class="text-[#007AFF] font-[900] text-sm">입력</button></div>
+                    <div class="one-item p-6 flex flex-wrap justify-center gap-2">
+                        ${meal ? meal.split(',').map(m => `<span class="bg-white px-4 py-1.5 rounded-full text-[15px] font-[900] shadow-sm">${m.trim()}</span>`).join('') : '<p class="text-gray-400 font-[800] py-4 text-center w-full">오늘의 메뉴를 입력해 보세요.</p>'}
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderTime() {
+            const list = state.data.timetables[state.dates.tdStr] || [];
+            return `
+                <div class="one-panel p-2 flex mb-6 shadow-inner bg-[#F2F2F7]"><div class="flex-1 py-3 text-center rounded-[24px] bg-white shadow-sm font-[900]">오늘 시간표</div></div>
+                <div class="space-y-4">
+                    <button onclick="openInputModal('TIME', '${state.dates.tdStr}')" class="w-full py-5 one-panel text-[#007AFF] font-[900] text-lg border-2 border-dashed border-[#007AFF]/20 flex items-center justify-center gap-3">전체 시간표 편집</button>
+                    ${list.length ? list.map((t, idx) => `
+                        <div class="one-panel p-6 flex items-center justify-between transition-all hover:translate-y-[-2px]">
+                            <div class="flex items-center gap-6">
+                                <div class="w-12 h-12 one-item flex items-center justify-center font-[900] text-[22px] text-[#007AFF]">${idx+1}</div>
+                                <div><h4 class="font-[900] text-[19px]">${t}</h4>${state.data.memos[state.dates.tdStr+'_'+(idx+1)] ? `<p class="text-[13px] text-[#007AFF] font-[900] mt-1">💡 ${state.data.memos[state.dates.tdStr+'_'+(idx+1)]}</p>` : ''}</div>
+                            </div>
+                            <button onclick="openInputModal('MEMO', '${state.dates.tdStr}_${idx+1}')" class="btn-press text-gray-300"><svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 4v16m8-8H4"/></svg></button>
+                        </div>
+                    `).join('') : '<div class="one-panel p-20 text-center text-gray-400 font-[900]">등록된 시간표 정보가 없습니다.</div>'}
+                </div>
+            `;
+        }
+
+        function renderMeal() {
+            const Card = (d, title) => {
+                const m = state.data.meals[d];
+                return `
+                    <div class="one-panel p-8 mb-8">
+                        <div class="flex justify-between items-center mb-6"><h2 class="text-[22px] font-[900]">${title}</h2><button onclick="openInputModal('MEAL', '${d}')" class="text-[#007AFF] font-[900] text-sm bg-[#F2F2F7] px-4 py-2 rounded-full">편집</button></div>
+                        <div class="one-item p-8 flex flex-wrap justify-center gap-2">
+                            ${m ? m.split(',').map(it => `<span class="bg-white px-5 py-2 rounded-full text-[16px] font-[900] shadow-sm">${it.trim()}</span>`).join('') : '<p class="text-gray-400 font-[800] py-6 text-center w-full">정보가 없습니다.</p>'}
+                        </div>
+                    </div>
+                `;
+            }
+            return Card(state.dates.tdStr, "오늘의 점심") + Card(state.dates.tmStr, "내일의 점심");
+        }
+
+        function renderClass() {
+            return `
+                <div class="space-y-8 pb-10">
+                    <div class="one-panel p-8">
+                        <div class="flex justify-between items-center mb-6"><h2 class="text-[22px] font-[900]">내 플래너</h2><button onclick="openInputModal('PLAN_ADD')" class="btn-press bg-[#007AFF] text-white w-9 h-9 rounded-full flex items-center justify-center font-bold text-xl">+</button></div>
+                        <div class="space-y-4">
+                            ${(state.data.planner || []).length ? state.data.planner.map(t => `
+                                <div class="bg-white border border-[#E5E5EA] rounded-[24px] p-5 flex items-center justify-between shadow-sm">
+                                    <button onclick="togglePlanner('${t.id}', ${!t.done})" class="flex items-center gap-4 flex-1 text-left">
+                                        <div class="w-7 h-7 rounded-full border-2 flex items-center justify-center ${t.done ? 'bg-[#007AFF] border-[#007AFF] text-white' : 'border-[#D1D1D6] text-transparent'}"><svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg></div>
+                                        <span class="font-[900] text-[16px] ${t.done ? 'line-through text-gray-400' : ''}">${t.text}</span>
+                                    </button>
+                                    <button onclick="deleteDoc('planner', '${t.id}', true)" class="text-red-400 p-2 font-bold">×</button>
+                                </div>
+                            `).join('') : '<p class="text-center text-gray-400 py-6 font-[800]">오늘의 계획을 세워보세요.</p>'}
+                        </div>
+                    </div>
+                    <div class="one-panel p-8">
+                        <div class="flex justify-between items-center mb-6"><h2 class="text-[22px] font-[900]">통합 일정</h2><button onclick="openInputModal('SCHED')" class="text-[#007AFF] font-[900] bg-[#F2F2F7] px-4 py-2 rounded-full text-sm">일정 추가</button></div>
+                        <div class="space-y-4">${(state.data.schedules || []).length ? state.data.schedules.map(s => `<div class="one-item p-5 flex justify-between items-center relative group"><div><h3 class="font-[900]">${s.title}</h3><p class="text-[12px] font-[800] text-[#8E8E93] mt-1">${s.date}</p></div><button onclick="deleteDoc('schedules', '${s.id}')" class="text-red-400 p-2">×</button></div>`).join('') : '<p class="text-center text-gray-400 py-6 font-[600]">예정된 일정이 없습니다.</p>'}</div>
+                    </div>
+                    <div class="one-panel p-8">
+                        <div class="flex justify-between items-center mb-6"><h2 class="text-[22px] font-[900]">자료 보관함</h2><button onclick="openInputModal('FILE')" class="text-[#007AFF] font-[900] bg-[#F2F2F7] px-4 py-2 rounded-full text-sm">공유</button></div>
+                        <div class="grid gap-4">${(state.data.materials || []).length ? state.data.materials.map(m => `<a href="${m.link}" target="_blank" class="one-item p-5 flex items-center justify-between shadow-sm border border-white"><div><h3 class="font-[900]">${m.title}</h3><p class="text-[12px] font-[800] text-[#8E8E93]">${m.subject}</p></div><button onclick="event.preventDefault(); deleteDoc('materials', '${m.id}')" class="text-red-400 p-2">×</button></a>`).join('') : '<p class="text-center text-gray-400 py-6 font-[600]">공유된 자료가 아직 없습니다.</p>'}</div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // --- 4. DATA ACTIONS ---
+        async function togglePlanner(id, done) {
+            const user = auth.currentUser;
+            if (!user) return;
+            await db.collection('artifacts').doc(appId).collection('users').doc(user.uid).collection('planner').doc(id).update({ done });
+        }
+
+        async function deleteDoc(col, id, isPrivate = false) {
+            const user = auth.currentUser;
+            if (!user || !confirm("정말로 삭제하시겠습니까?")) return;
+            const ref = isPrivate ? db.collection('artifacts').doc(appId).collection('users').doc(user.uid).collection(col) : db.collection('artifacts').doc(appId).collection('public').doc('data').collection(col);
+            await ref.doc(id).delete();
+        }
+
+        // --- 5. MODALS & UI HELPERS ---
+        function openInputModal(type, targetId = '') { renderModal('INPUT', { type, targetId }); }
+
+        function renderModal(type, payload = {}) {
+            const mc = document.getElementById('modal-container');
+            mc.classList.remove('hidden');
+            let content = '';
+
+            const title = {NOTICE:'새 공지', SCHED:'일정 등록', FILE:'자료 공유', PLAN_ADD:'할 일 추가', MEMO:'수업 메모', MEAL:'식단 입력', TIME:'시간표 편집'}[payload.type];
+            content = `
+                <div class="one-panel w-full max-w-md p-8 m-4 rounded-t-[40px] md:rounded-[40px] animate-in slide-in-from-bottom duration-300">
+                    <h3 class="text-[22px] font-[900] mb-8 text-center">${title}</h3>
+                    <div class="space-y-4">
+                        ${payload.type === 'PLAN_ADD' || payload.type === 'MEMO' || payload.type === 'MEAL' || payload.type === 'TIME' ? `<input id="val-1" placeholder="${payload.type==='MEAL'?'메뉴들을 쉼표로 구분':(payload.type==='TIME'?'과목들을 쉼표로 구분':'내용 입력')}" class="w-full one-input p-5 text-lg">` : ''}
+                        ${payload.type === 'NOTICE' ? `<input id="val-1" placeholder="제목" class="w-full one-input p-5"><textarea id="val-2" placeholder="상세 내용" class="w-full one-input p-5 min-h-[100px]"></textarea>` : ''}
+                        ${payload.type === 'SCHED' ? `<input id="val-1" placeholder="일정 이름" class="w-full one-input p-5"><input id="val-2" type="date" class="w-full one-input p-5">` : ''}
+                        ${payload.type === 'FILE' ? `<input id="val-1" placeholder="자료 이름" class="w-full one-input p-5"><input id="val-2" placeholder="과목" class="w-full one-input p-5"><input id="val-3" placeholder="URL 링크" class="w-full one-input p-5">` : ''}
+                    </div>
+                    <div class="flex gap-4 mt-8">
+                        <button onclick="closeModal()" class="flex-1 one-item py-5 font-[900] text-lg">취소</button>
+                        <button onclick="submitInput('${payload.type}', '${payload.targetId}')" class="flex-1 bg-[#007AFF] text-white py-5 rounded-[28px] font-[900] text-lg shadow-lg">확인</button>
+                    </div>
+                </div>
+            `;
+            mc.innerHTML = content;
+        }
+
+        async function submitInput(type, targetId) {
+            const user = auth.currentUser;
+            if (!user) return alert("인증 처리 중입니다. 잠시만 기다려 주세요.");
+
+            const pub = (col) => db.collection('artifacts').doc(appId).collection('public').doc('data').collection(col);
+            const priv = (col) => db.collection('artifacts').doc(appId).collection('users').doc(user.uid).collection(col);
+            
+            try {
+                const v1 = document.getElementById('val-1')?.value;
+                const v2 = document.getElementById('val-2')?.value;
+                const v3 = document.getElementById('val-3')?.value;
+
+                if (type === 'NOTICE') await pub('announcements').add({ title: v1, content: v2, at: Date.now() });
+                if (type === 'PLAN_ADD') await priv('planner').add({ text: v1, done: false, date: state.dates.tdStr, at: Date.now() });
+                if (type === 'SCHED') await pub('schedules').add({ title: v1, date: v2, at: Date.now() });
+                if (type === 'FILE') await pub('materials').add({ title: v1, subject: v2, link: v3, at: Date.now() });
+                if (type === 'MEMO') await pub('memos').doc(targetId).set({ content: v1, at: Date.now() });
+                if (type === 'MEAL') await pub('meals').doc(targetId).set({ menu: v1, at: Date.now() });
+                if (type === 'TIME') await pub('timetables').doc(targetId).set({ periods: (v1 || '').split(',').map(s=>s.trim()), at: Date.now() });
+            } catch(e) { 
+                console.error(e); 
+                document.getElementById('permission-error').style.display = 'block';
+            }
+            closeModal();
+        }
+
+        function closeModal() { document.getElementById('modal-container').classList.add('hidden'); }
+
         window.onscroll = function() {
             const nav = document.getElementById('nav-container');
             const wrap = document.getElementById('floating-bar');
             const texts = document.querySelectorAll('.nav-text');
             const isScrolled = window.scrollY > 40;
 
-            if (wrap && nav && !wrap.classList.contains('hidden')) {
-                if (isScrolled) {
-                    wrap.style.width = '280px';
-                    nav.style.height = '58px';
-                    texts.forEach(t => t.classList.add('hidden-text'));
-                } else {
-                    wrap.style.width = 'calc(100% - 40px)';
-                    nav.style.height = '76px';
-                    texts.forEach(t => t.classList.remove('hidden-text'));
-                }
+            if (isScrolled) {
+                wrap.style.width = '240px';
+                nav.style.height = '58px';
+                texts.forEach(t => t.classList.add('hidden-text'));
+            } else {
+                wrap.style.width = 'calc(100% - 40px)';
+                nav.style.height = '76px';
+                texts.forEach(t => t.classList.remove('hidden-text'));
             }
         };
 
-        const init = async () => {
-            const timeout = setTimeout(() => {
-                if(!window.state.isDataLoaded) {
-                    ui.hideLoading();
-                    ui.showToast("오프라인 상태로 진입합니다.");
-                    router.navigate('home');
-                }
-            }, 3000);
-
-            try {
-                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                    await signInWithCustomToken(auth, __initial_auth_token);
-                } else {
-                    await signInAnonymously(auth);
-                }
-                
-                onAuthStateChanged(auth, (u) => { 
-                    if (!u) return;
-                    
-                    // Listeners for all collections
-                    onSnapshot(getCol('exams'), (snap) => { window.state.exams = snap.docs.map(d => ({ id: d.id, ...d.data() })); ui.render(); window.state.isDataLoaded = true; ui.hideLoading(); clearTimeout(timeout); });
-                    onSnapshot(getCol('results'), (snap) => { window.state.results = snap.docs.map(d => ({ id: d.id, ...d.data() })); ui.render(); });
-                    onSnapshot(getCol('memos'), (snap) => { window.state.memos = snap.docs.map(d => ({ id: d.id, ...d.data() })); ui.render(); });
-                    onSnapshot(getCol('meals'), (snap) => { window.state.meals = snap.docs.map(d => ({ id: d.id, ...d.data() })); ui.render(); });
-                    onSnapshot(getCol('timetables'), (snap) => { window.state.timetables = snap.docs.map(d => ({ id: d.id, ...d.data() })); ui.render(); });
-                    onSnapshot(getCol('materials'), (snap) => { window.state.materials = snap.docs.map(d => ({ id: d.id, ...d.data() })); ui.render(); });
-                });
-                
-                // 로그인 화면 없이 무조건 홈으로 바로 진입
-                router.navigate('home');
-
-            } catch (e) {
-                console.error("Init error", e);
-                ui.hideLoading();
-                clearTimeout(timeout);
-            }
-        };
-
-        if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', init);
-        } else {
-            init();
-        }
+        init();
     </script>
 </body>
-  </html>
+</html>
