@@ -2,102 +2,114 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Duru Tester</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@400;600;800;900&display=swap" rel="stylesheet">
     <style>
-        body { font-family: 'Noto Sans KR', sans-serif; -webkit-tap-highlight-color: transparent; overflow-x: hidden; }
-        .material-symbols-rounded { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
-        .active-tab .material-symbols-rounded { font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
-        .glass { background: rgba(255, 255, 255, 0.8); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); }
-        .toast-active { transform: translate(-50%, -24px) !important; opacity: 1 !important; }
+        body { font-family: 'Pretendard', sans-serif; background-color: #F2F2F7; -webkit-tap-highlight-color: transparent; overflow-x: hidden; }
+        
+        /* Duru Design System */
+        .one-panel { background: white; border-radius: 32px; box-shadow: 0 4px 20px rgba(0,0,0,0.02), 0 0 1px rgba(0,0,0,0.05); }
+        .one-item { background: #F2F2F7; border-radius: 24px; }
+        .btn-press:active { transform: scale(0.96); opacity: 0.8; }
+        .btn-press { transition: transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.2s; }
+        .nav-active { background-color: #F2F2F7; color: #000 !important; }
+        .hidden-text { max-height: 0; opacity: 0; margin-top: 0; pointer-events: none; overflow: hidden; }
         .no-scrollbar::-webkit-scrollbar { display: none; }
+        .modal-bg { background: rgba(0,0,0,0.4); backdrop-filter: blur(10px); }
+        
+        /* Utility */
+        .material-symbols-rounded { font-variation-settings: 'FILL' 0, 'wght' 600, 'GRAD' 0, 'opsz' 24; }
+        .active-tab .material-symbols-rounded { font-variation-settings: 'FILL' 1, 'wght' 600, 'GRAD' 0, 'opsz' 24; }
+        .toast-active { transform: translate(-50%, -24px) !important; opacity: 1 !important; }
+        
+        /* Loading Animation */
+        .loader { width: 30px; height: 30px; border: 4px solid #E5E5EA; border-top-color: #007AFF; border-radius: 50%; animation: spin 1s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
     </style>
 </head>
-<body class="bg-[#f8f9ff] text-[#1a1c1e] min-h-screen">
+<body class="selection:bg-[#E5F1FF] text-[#1D1D1F]">
 
     <div id="app" class="max-w-md mx-auto min-h-screen relative pb-32">
         <!-- Loading Screen -->
         <div id="loading" class="fixed inset-0 bg-white z-[100] flex flex-col items-center justify-center transition-opacity duration-500">
-            <div class="flex flex-col items-center gap-4">
-                <div class="w-12 h-12 border-4 border-[#dbe4ff] border-t-[#0048e3] rounded-full animate-spin"></div>
-                <p class="text-sm font-bold text-gray-400 animate-pulse">데이터를 동기화 중입니다...</p>
-            </div>
+            <div class="loader mb-4"></div>
+            <p class="text-[14px] font-[800] text-[#8E8E93] animate-pulse">데이터를 동기화 중입니다...</p>
         </div>
 
         <!-- In-app Toast -->
-        <div id="toast" class="fixed bottom-0 left-1/2 -translate-x-1/2 mb-24 z-[300] bg-[#313033] text-[#f4f0f4] px-6 py-3 rounded-2xl text-sm shadow-xl opacity-0 transition-all duration-300 pointer-events-none whitespace-nowrap"></div>
+        <div id="toast" class="fixed bottom-0 left-1/2 -translate-x-1/2 mb-24 z-[300] bg-[#313033] text-white px-6 py-3 rounded-[100px] text-[13px] font-[800] shadow-xl opacity-0 transition-all duration-300 pointer-events-none whitespace-nowrap"></div>
 
         <!-- Global Confirm Modal -->
-        <div id="confirm-modal" class="fixed inset-0 bg-black/40 backdrop-blur-sm z-[250] hidden items-center justify-center p-6">
-            <div class="bg-white w-full max-w-xs rounded-[2.5rem] p-8 shadow-2xl">
-                <h3 id="confirm-title" class="text-xl font-bold mb-2 text-center text-[#1c1b1f]">확인</h3>
-                <p id="confirm-desc" class="text-sm text-gray-500 text-center mb-6">설명이 표시됩니다.</p>
-                <div class="flex gap-2">
-                    <button onclick="ui.closeConfirm()" class="flex-1 py-3 bg-gray-100 rounded-full font-bold text-gray-600">취소</button>
-                    <button id="confirm-btn" class="flex-1 py-3 bg-[#ba1a1a] text-white rounded-full font-bold">확인</button>
+        <div id="confirm-modal" class="fixed inset-0 z-[250] hidden modal-bg items-center justify-center p-6">
+            <div class="one-panel w-full max-w-xs p-8 animate-in zoom-in-95 duration-200">
+                <h3 id="confirm-title" class="text-[20px] font-[900] mb-2 text-center text-[#1D1D1F]">확인</h3>
+                <p id="confirm-desc" class="text-[14px] text-[#8E8E93] font-[600] text-center mb-8">설명이 표시됩니다.</p>
+                <div class="flex gap-3">
+                    <button onclick="ui.closeConfirm()" class="flex-1 py-3.5 bg-[#F2F2F7] rounded-full font-[800] text-[#5C5C5C] btn-press">취소</button>
+                    <button id="confirm-btn" class="flex-1 py-3.5 bg-[#FF3B30] text-white rounded-full font-[800] btn-press">확인</button>
                 </div>
             </div>
         </div>
 
         <!-- Admin Edit Question Modal -->
-        <div id="edit-modal" class="fixed inset-0 bg-black/40 backdrop-blur-sm z-[200] hidden items-center justify-center p-6 overflow-y-auto">
-            <div class="bg-white w-full max-w-sm rounded-[2.5rem] p-6 shadow-2xl my-auto">
-                <h2 class="text-xl font-bold mb-4">문항 개별 편집</h2>
-                <div class="space-y-3 max-h-[60vh] overflow-y-auto pr-2">
+        <div id="edit-modal" class="fixed inset-0 z-[200] hidden modal-bg items-center justify-center p-6 overflow-y-auto">
+            <div class="one-panel w-full max-w-sm p-8 my-auto animate-in slide-in-from-bottom-8 duration-300">
+                <h2 class="text-[22px] font-[900] mb-6 text-center">문항 개별 편집</h2>
+                <div class="space-y-4 max-h-[55vh] overflow-y-auto pr-2 no-scrollbar">
                     <div>
-                        <label class="text-[10px] font-bold text-gray-400 block mb-1 uppercase">질문 내용</label>
-                        <textarea id="edit-q-text" class="w-full bg-gray-50 p-3 rounded-xl text-sm border-none outline-none focus:ring-2 focus:ring-indigo-200" rows="3"></textarea>
+                        <label class="text-[11px] font-[900] text-[#8E8E93] block mb-2">질문 내용</label>
+                        <textarea id="edit-q-text" class="w-full one-item p-4 text-[14px] font-[600] border-2 border-transparent outline-none focus:border-[#007AFF] transition-colors" rows="3"></textarea>
                     </div>
-                    <div id="edit-options-container" class="space-y-2">
-                        <label class="text-[10px] font-bold text-gray-400 block mb-1 uppercase">선지 및 해설</label>
+                    <div id="edit-options-container" class="space-y-3">
+                        <label class="text-[11px] font-[900] text-[#8E8E93] block mb-2">선지 및 해설</label>
                     </div>
                     <div>
-                        <label class="text-[10px] font-bold text-indigo-400 block mb-1 uppercase">정답 인덱스 (0~4)</label>
-                        <input type="number" id="edit-q-answer" min="0" max="4" class="w-full bg-indigo-50 text-indigo-700 font-bold p-3 rounded-xl text-sm border-none outline-none focus:ring-2 focus:ring-indigo-400">
+                        <label class="text-[11px] font-[900] text-[#007AFF] block mb-2">정답 인덱스 (0~4)</label>
+                        <input type="number" id="edit-q-answer" min="0" max="4" class="w-full bg-[#E5F1FF] text-[#007AFF] font-[900] p-4 rounded-[20px] text-[16px] outline-none">
                     </div>
                 </div>
-                <div class="flex gap-2 mt-6">
-                    <button onclick="ui.closeEditModal()" class="flex-1 py-3 bg-gray-100 rounded-xl font-bold text-gray-500">닫기</button>
-                    <button id="save-edit-btn" class="flex-1 py-3 bg-[#6750a4] text-white rounded-xl font-bold">저장하기</button>
+                <div class="flex gap-3 mt-8">
+                    <button onclick="ui.closeEditModal()" class="flex-1 py-4 bg-[#F2F2F7] rounded-full font-[800] text-[#5C5C5C] btn-press">닫기</button>
+                    <button id="save-edit-btn" class="flex-1 py-4 bg-[#007AFF] text-white rounded-full font-[800] btn-press">저장하기</button>
                 </div>
             </div>
         </div>
 
         <!-- Admin Auth Modal -->
-        <div id="admin-modal" class="fixed inset-0 bg-black/40 backdrop-blur-sm z-[200] hidden items-center justify-center p-6">
-            <div class="bg-white w-full max-w-sm rounded-[2.5rem] p-8 shadow-2xl">
-                <h2 class="text-xl font-bold mb-6 text-center text-[#21103e]">관리자 인증</h2>
-                <input type="password" id="admin-pw-input" placeholder="비밀번호" class="w-full bg-[#f3edf7] px-6 py-4 rounded-2xl text-center outline-none border-2 border-transparent focus:border-[#d0bcff] mb-4">
+        <div id="admin-modal" class="fixed inset-0 z-[200] hidden modal-bg items-center justify-center p-6">
+            <div class="one-panel w-full max-w-sm p-8 animate-in zoom-in-95 duration-200">
+                <h2 class="text-[22px] font-[900] mb-6 text-center">관리자 인증</h2>
+                <input type="password" id="admin-pw-input" placeholder="비밀번호" class="w-full one-item px-6 py-4 text-center font-[800] outline-none border-2 border-transparent focus:border-[#007AFF] mb-6">
                 <div class="flex gap-3">
-                    <button onclick="ui.closeAdminModal()" class="flex-1 py-4 bg-gray-50 rounded-2xl font-bold text-gray-500">취소</button>
-                    <button onclick="ui.verifyAdmin()" class="flex-1 py-4 bg-[#6750a4] text-white rounded-2xl font-bold">확인</button>
+                    <button onclick="ui.closeAdminModal()" class="flex-1 py-4 bg-[#F2F2F7] rounded-full font-[800] text-[#5C5C5C] btn-press">취소</button>
+                    <button onclick="ui.verifyAdmin()" class="flex-1 py-4 bg-[#007AFF] text-white rounded-full font-[800] btn-press">확인</button>
                 </div>
             </div>
         </div>
 
         <!-- Main Content -->
-        <div id="content" class="p-6 pt-12"></div>
+        <div id="content" class="p-5 pt-12 mt-4 space-y-8"></div>
 
-        <!-- Bottom Navigation -->
-        <nav id="navbar" class="fixed bottom-6 left-1/2 -translate-x-1/2 w-[calc(100%-3rem)] max-w-sm z-50 hidden">
-            <div class="glass shadow-[0_8px_32px_rgba(0,0,0,0.06)] rounded-[2.5rem] px-4 py-3 flex justify-between items-center border border-white/50">
-                <button onclick="router.navigate('home')" class="nav-btn flex flex-col items-center gap-1 w-20" data-tab="home">
-                    <div class="icon-box px-5 py-1.5 rounded-full transition-all duration-300"><span class="material-symbols-rounded">home</span></div>
-                    <span class="text-[10px] font-bold">홈</span>
+        <!-- Floating UI Navigation (Shrinking on Scroll) -->
+        <div id="floating-bar" class="fixed left-1/2 -translate-x-1/2 bottom-6 w-[calc(100%-40px)] max-w-sm transition-all duration-500 z-50 hidden">
+            <nav class="bg-white/95 backdrop-blur-2xl shadow-[0_8px_40px_rgba(0,0,0,0.08)] rounded-[100px] flex items-center justify-between p-2 h-[76px] transition-all duration-500" id="nav-container">
+                <button onclick="router.navigate('home')" class="nav-btn nav-item flex-1 flex flex-col items-center justify-center h-full rounded-full btn-press relative transition-all text-gray-400" data-tab="home">
+                    <div class="relative z-10 flex items-center justify-center"><span class="material-symbols-rounded text-[24px]">home</span></div>
+                    <span class="nav-text text-[11px] font-[900] mt-1 relative z-10 transition-all duration-300">홈</span>
                 </button>
-                <button onclick="router.navigate('quiz')" class="nav-btn flex flex-col items-center gap-1 w-20" data-tab="quiz">
-                    <div class="icon-box px-5 py-1.5 rounded-full transition-all duration-300"><span class="material-symbols-rounded">quiz</span></div>
-                    <span class="text-[10px] font-bold">시험 센터</span>
+                <button onclick="router.navigate('quiz')" class="nav-btn nav-item flex-1 flex flex-col items-center justify-center h-full rounded-full btn-press relative transition-all text-gray-400" data-tab="quiz">
+                    <div class="relative z-10 flex items-center justify-center"><span class="material-symbols-rounded text-[24px]">quiz</span></div>
+                    <span class="nav-text text-[11px] font-[900] mt-1 relative z-10 transition-all duration-300">시험 센터</span>
                 </button>
-                <button onclick="router.navigate('profile')" class="nav-btn flex flex-col items-center gap-1 w-20" data-tab="profile">
-                    <div class="icon-box px-5 py-1.5 rounded-full transition-all duration-300"><span class="material-symbols-rounded">history</span></div>
-                    <span class="text-[10px] font-bold">학습기록</span>
+                <button onclick="router.navigate('profile')" class="nav-btn nav-item flex-1 flex flex-col items-center justify-center h-full rounded-full btn-press relative transition-all text-gray-400" data-tab="profile">
+                    <div class="relative z-10 flex items-center justify-center"><span class="material-symbols-rounded text-[24px]">history</span></div>
+                    <span class="nav-text text-[11px] font-[900] mt-1 relative z-10 transition-all duration-300">학습기록</span>
                 </button>
-            </div>
-        </nav>
+            </nav>
+        </div>
     </div>
 
     <script type="module">
@@ -190,15 +202,14 @@
                 const container = document.getElementById('edit-options-container');
                 container.innerHTML = '';
                 
-                // 단일 문자열 해설일 경우를 대비한 배열 변환 처리
                 const explanationsArray = Array.isArray(q.explanations) ? q.explanations : Array(q.options.length).fill(q.explanations || '');
                 
                 q.options.forEach((opt, i) => {
                     const div = document.createElement('div');
-                    div.className = "bg-gray-50 p-3 rounded-xl space-y-2 border border-gray-100";
+                    div.className = "one-item p-4 space-y-3";
                     div.innerHTML = `
-                        <input type="text" value="${opt}" class="opt-val w-full bg-white px-3 py-2 rounded-lg text-xs outline-none border-none focus:ring-1 focus:ring-indigo-200" placeholder="선지 ${i+1}">
-                        <input type="text" value="${explanationsArray[i] || ''}" class="exp-val w-full bg-white px-3 py-2 rounded-lg text-[10px] outline-none border-none focus:ring-1 focus:ring-indigo-200" placeholder="해설 ${i+1}">
+                        <input type="text" value="${opt}" class="opt-val w-full bg-white px-4 py-3 rounded-[16px] text-[13px] font-[800] outline-none border-2 border-transparent focus:border-[#007AFF]" placeholder="선지 ${i+1}">
+                        <input type="text" value="${explanationsArray[i] || ''}" class="exp-val w-full bg-white px-4 py-3 rounded-[16px] text-[12px] font-[600] outline-none border-2 border-transparent focus:border-[#007AFF]" placeholder="해설 ${i+1}">
                     `;
                     container.appendChild(div);
                 });
@@ -345,7 +356,6 @@
                     explanations: q.explanations || []
                 }));
 
-                // Number() 처리를 통해 타입 불일치 에러 완벽 차단
                 exam.questions.forEach((q, i) => { 
                     if (window.state.answers[i] !== undefined && Number(q.answer) === Number(window.state.answers[i])) {
                         score++; 
@@ -379,7 +389,7 @@
             },
             render: () => {
                 const content = document.getElementById('content');
-                const nav = document.getElementById('navbar');
+                const nav = document.getElementById('floating-bar');
                 if (!content || !nav) return;
 
                 const isFullScreenView = ['login', 'solving', 'result_detail'].includes(window.state.currentView);
@@ -387,57 +397,54 @@
 
                 document.querySelectorAll('.nav-btn').forEach(btn => {
                     const active = btn.dataset.tab === window.state.currentView;
-                    btn.classList.toggle('text-[#002ba3]', active);
-                    btn.classList.toggle('text-gray-400', !active);
-                    btn.classList.toggle('active-tab', active);
-                    btn.querySelector('.icon-box').classList.toggle('bg-[#dbe4ff]', active);
+                    if(active) {
+                        btn.classList.add('nav-active');
+                        btn.classList.replace('text-gray-400', 'text-black');
+                    } else {
+                        btn.classList.remove('nav-active');
+                        btn.classList.replace('text-black', 'text-gray-400');
+                    }
                 });
 
                 if (window.state.currentView === 'login') {
                     content.innerHTML = `
                         <div class="flex flex-col items-center justify-center min-h-[80vh] gap-10">
                             <div class="text-center select-none" onclick="ui.handleTitleClick()">
-                                <div class="w-20 h-20 bg-[#e0e8ff] text-[#0048e3] rounded-[2rem] flex items-center justify-center mx-auto mb-6 shadow-sm">
+                                <div class="w-20 h-20 bg-white shadow-sm text-[#007AFF] rounded-[24px] flex items-center justify-center mx-auto mb-6">
                                     <span class="material-symbols-rounded text-4xl">history_edu</span>
                                 </div>
-                                <h1 class="text-3xl font-black tracking-tighter">Duru Tester</h1>
-                                <p class="text-gray-400 text-sm mt-1 uppercase tracking-widest font-bold">Smart Assessment</p>
+                                <h1 class="text-[34px] font-[900] tracking-tight text-[#1D1D1F]">Duru Tester</h1>
+                                <p class="text-[#8E8E93] text-[13px] mt-2 font-[800] tracking-widest uppercase">Smart Assessment</p>
                             </div>
                             <div class="w-full space-y-4">
                                 <input id="student-id-input" type="text" maxlength="5" placeholder="학번 5자리 입력 (예: 10101)" 
-                                    class="w-full bg-white rounded-[2rem] py-5 px-8 text-center text-xl shadow-sm focus:ring-4 focus:ring-[#dbe4ff] outline-none border-none transition-all">
-                                <button onclick="ui.login()" class="w-full bg-[#0048e3] text-white py-5 rounded-[2rem] font-bold text-lg shadow-lg active:scale-95 transition-all">입장하기</button>
+                                    class="w-full one-panel py-5 px-8 text-center text-[18px] font-[800] outline-none border-2 border-transparent focus:border-[#007AFF] transition-all">
+                                <button onclick="ui.login()" class="w-full bg-[#007AFF] text-white py-5 rounded-[32px] font-[900] text-[18px] shadow-lg btn-press">입장하기</button>
                             </div>
                         </div>
                     `;
                 } else if (window.state.currentView === 'home') {
                     content.innerHTML = `
-                        <div class="space-y-8">
-                            <header>
-                                <p class="text-[#0048e3] font-bold text-sm uppercase tracking-tighter">HELLO,</p>
-                                <h2 class="text-3xl font-black">${window.state.studentId}님</h2>
-                            </header>
-                            
-                            <div class="bg-[#dbe4ff] p-8 rounded-[2.5rem] shadow-sm relative overflow-hidden">
-                                <div class="relative z-10 space-y-4">
-                                    <h3 class="text-xl font-bold text-[#001d6d]">새로운 시험에<br>도전해보세요!</h3>
-                                    <p class="text-[#001d6d]/60 text-xs leading-relaxed">하단 메뉴의 '시험 센터'에서<br>등록된 시험들을 확인할 수 있습니다.</p>
-                                    <button onclick="router.navigate('quiz')" class="bg-[#0048e3] text-white font-bold py-3 px-8 rounded-2xl shadow-md active:scale-95 transition-all mt-2">시험 센터로 이동</button>
-                                </div>
-                                <span class="material-symbols-rounded absolute -right-4 -bottom-8 text-[150px] text-[#0048e3]/10 rotate-12">local_library</span>
+                        <div class="one-panel p-8 text-center bg-gradient-to-br from-[#007AFF]/10 to-white min-h-[140px] flex flex-col justify-center relative overflow-hidden">
+                            <div class="relative z-10 text-left">
+                                <p class="text-[12px] font-[900] text-[#007AFF] mb-1 tracking-widest uppercase">WELCOME BACK</p>
+                                <h2 class="font-[900] text-[28px] text-[#1D1D1F]">${window.state.studentId}님</h2>
+                                <p class="text-[13px] font-[600] text-[#5C5C5C] mt-2 leading-relaxed">하단 메뉴의 '시험 센터'에서<br>새로운 모의고사에 도전해보세요.</p>
+                                <button onclick="router.navigate('quiz')" class="mt-4 bg-[#007AFF] text-white font-[900] py-3 px-6 rounded-full shadow-md btn-press text-[14px]">시험 센터로 이동</button>
                             </div>
+                            <span class="material-symbols-rounded absolute -right-4 -bottom-6 text-[120px] text-[#007AFF]/5 rotate-12">local_library</span>
+                        </div>
 
-                            <div class="grid grid-cols-2 gap-3">
-                                <div class="bg-white p-6 rounded-[2rem] shadow-sm">
-                                    <span class="material-symbols-rounded text-green-500 mb-2">verified</span>
-                                    <p class="font-bold text-gray-800 text-sm">진행 가능 시험</p>
-                                    <p class="text-2xl font-black text-gray-900 mt-1">${window.state.exams.length}</p>
-                                </div>
-                                <div class="bg-white p-6 rounded-[2rem] shadow-sm" onclick="router.navigate('profile')">
-                                    <span class="material-symbols-rounded text-orange-500 mb-2">analytics</span>
-                                    <p class="font-bold text-gray-800 text-sm">나의 응시 횟수</p>
-                                    <p class="text-2xl font-black text-gray-900 mt-1">${window.state.results.filter(r => r.studentId === window.state.studentId).length}</p>
-                                </div>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div class="one-panel p-6 flex flex-col items-center text-center">
+                                <span class="material-symbols-rounded text-[#34C759] text-3xl mb-2">verified</span>
+                                <p class="font-[900] text-[#1D1D1F] text-[15px]">진행 가능 시험</p>
+                                <p class="text-[28px] font-[900] text-[#1D1D1F] mt-1">${window.state.exams.length}</p>
+                            </div>
+                            <div class="one-panel p-6 flex flex-col items-center text-center btn-press" onclick="router.navigate('profile')">
+                                <span class="material-symbols-rounded text-[#FF9500] text-3xl mb-2">analytics</span>
+                                <p class="font-[900] text-[#1D1D1F] text-[15px]">나의 응시 횟수</p>
+                                <p class="text-[28px] font-[900] text-[#1D1D1F] mt-1">${window.state.results.filter(r => r.studentId === window.state.studentId).length}</p>
                             </div>
                         </div>
                     `;
@@ -447,92 +454,86 @@
                     if(!q) return router.navigate('home');
                     
                     content.innerHTML = `
-                        <div class="space-y-6">
-                            <div class="flex flex-col items-center gap-2 mb-4">
-                                <p class="text-xs font-black text-indigo-400 uppercase tracking-widest">${exam.title}</p>
-                                <div class="flex justify-between w-full items-center">
-                                    <span class="bg-indigo-100 text-indigo-600 px-4 py-1 rounded-full text-[10px] font-black uppercase">Q. ${window.state.quizIndex + 1} / ${exam.questions.length}</span>
-                                    <button onclick="router.navigate('quiz')" class="text-gray-300"><span class="material-symbols-rounded">close</span></button>
-                                </div>
+                        <div class="flex flex-col items-center gap-2 mb-2">
+                            <p class="text-[11px] font-[900] text-[#007AFF] uppercase tracking-widest">${exam.title}</p>
+                            <div class="flex justify-between w-full items-center">
+                                <span class="bg-[#E5F1FF] text-[#007AFF] px-4 py-1.5 rounded-full text-[12px] font-[900] uppercase">Q. ${window.state.quizIndex + 1} / ${exam.questions.length}</span>
+                                <button onclick="router.navigate('quiz')" class="text-[#8E8E93] btn-press"><span class="material-symbols-rounded">close</span></button>
                             </div>
-                            <div class="bg-white p-8 rounded-[2.5rem] shadow-sm min-h-[140px] flex items-center border border-indigo-50">
-                                <h2 class="text-lg font-bold leading-relaxed tracking-tight break-keep text-[#1c1b1f]">${q.question}</h2>
-                            </div>
-                            <div class="space-y-3">
-                                ${q.options.map((opt, i) => `
-                                    <button onclick="ui.selectOption(${i})" class="w-full p-5 rounded-[1.8rem] text-left transition-all flex items-center gap-4 ${window.state.answers[window.state.quizIndex] === i ? 'bg-[#0048e3] text-white shadow-lg' : 'bg-white text-gray-600 shadow-sm'}">
-                                        <span class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${window.state.answers[window.state.quizIndex] === i ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-400'}">${i + 1}</span>
-                                        <span class="font-bold text-sm leading-snug">${opt}</span>
-                                    </button>
-                                `).join('')}
-                            </div>
-                            <button onclick="ui.nextQuestion()" ${window.state.answers[window.state.quizIndex] === undefined ? 'disabled' : ''} 
-                                class="w-full bg-[#0048e3] text-white py-5 rounded-[2rem] font-bold shadow-lg disabled:opacity-20 transition-all mt-4">
-                                ${window.state.quizIndex === exam.questions.length - 1 ? '제출하고 채점하기' : '다음 문제'}
-                            </button>
                         </div>
+                        <div class="one-panel p-8 min-h-[160px] flex items-center">
+                            <h2 class="text-[18px] font-[800] leading-relaxed tracking-tight break-keep text-[#1D1D1F]">${q.question}</h2>
+                        </div>
+                        <div class="space-y-3">
+                            ${q.options.map((opt, i) => `
+                                <button onclick="ui.selectOption(${i})" class="w-full p-5 rounded-[24px] text-left btn-press flex items-center gap-4 ${window.state.answers[window.state.quizIndex] === i ? 'bg-[#007AFF] text-white shadow-lg' : 'bg-white text-[#5C5C5C] shadow-[0_4px_20px_rgba(0,0,0,0.02)]'}">
+                                    <span class="w-8 h-8 rounded-full flex items-center justify-center text-[14px] font-[900] ${window.state.answers[window.state.quizIndex] === i ? 'bg-white/20 text-white' : 'bg-[#F2F2F7] text-[#8E8E93]'}">${i + 1}</span>
+                                    <span class="font-[800] text-[15px] leading-snug">${opt}</span>
+                                </button>
+                            `).join('')}
+                        </div>
+                        <button onclick="ui.nextQuestion()" ${window.state.answers[window.state.quizIndex] === undefined ? 'disabled' : ''} 
+                            class="w-full bg-[#007AFF] text-white py-5 rounded-[32px] font-[900] text-[17px] shadow-lg disabled:opacity-30 disabled:scale-100 btn-press mt-6">
+                            ${window.state.quizIndex === exam.questions.length - 1 ? '제출하고 채점하기' : '다음 문제'}
+                        </button>
                     `;
                 } else if (window.state.currentView === 'result_detail') {
                     const res = window.state.results.find(r => r.id === window.state.viewingResultId);
                     if (!res) {
-                        content.innerHTML = `<p class="text-center py-20">기록을 불러오는 중이거나 찾을 수 없습니다.</p>`;
+                        content.innerHTML = `<p class="text-center py-20 text-[#8E8E93] font-[800]">기록을 불러오는 중이거나 찾을 수 없습니다.</p>`;
                         return;
                     }
                     const qs = res.questionsSnapshot || [];
                     content.innerHTML = `
-                        <div class="space-y-8">
-                            <div class="flex items-center gap-4">
-                                <button onclick="router.navigate('profile')" class="text-gray-400"><span class="material-symbols-rounded">arrow_back</span></button>
-                                <span class="font-bold text-gray-500 text-sm">오답 노트 및 전체 해설</span>
-                            </div>
-                            <div class="text-center py-4">
-                                <p class="text-indigo-400 font-bold text-xs uppercase tracking-widest mb-2">${res.examTitle || '시험 결과'}</p>
-                                <h2 class="text-6xl font-black text-[#0048e3] my-2">${res.score}점</h2>
-                                <p class="text-gray-400 text-xs font-bold">${res.timestamp?.toDate().toLocaleString() || '최근'}</p>
-                            </div>
-                            <div class="space-y-6">
-                                ${qs.map((q, i) => {
-                                    const userAns = res.answers[i];
-                                    const correctAns = Number(q.answer);
-                                    const isCorrect = userAns !== undefined && Number(userAns) === correctAns;
-                                    
-                                    return `
-                                    <div class="bg-white p-6 rounded-[2.5rem] shadow-sm space-y-4 border-l-8 ${isCorrect ? 'border-green-400' : 'border-red-400'}">
-                                        <div class="flex gap-2 items-start">
-                                            <span class="text-xs font-black ${isCorrect ? 'text-green-500' : 'text-red-500'}">Q${i+1}</span>
-                                            <p class="font-bold text-sm text-gray-800 leading-snug">${q.question}</p>
+                        <div class="flex items-center gap-4 mb-4">
+                            <button onclick="router.navigate('profile')" class="text-[#8E8E93] btn-press"><span class="material-symbols-rounded">arrow_back</span></button>
+                            <span class="font-[900] text-[#1D1D1F] text-[18px]">상세 결과 및 해설</span>
+                        </div>
+                        <div class="one-panel p-8 text-center bg-gradient-to-br from-[#E5F1FF] to-white mb-8">
+                            <p class="text-[#007AFF] font-[900] text-[11px] uppercase tracking-widest mb-2">${res.examTitle || '시험 결과'}</p>
+                            <h2 class="text-[64px] font-[900] text-[#007AFF] leading-none mb-2">${res.score}<span class="text-[20px]">점</span></h2>
+                            <p class="text-[#8E8E93] text-[12px] font-[800]">${res.timestamp?.toDate().toLocaleString() || '최근'}</p>
+                        </div>
+                        <div class="space-y-6">
+                            ${qs.map((q, i) => {
+                                const userAns = res.answers[i];
+                                const correctAns = Number(q.answer);
+                                const isCorrect = userAns !== undefined && Number(userAns) === correctAns;
+                                
+                                return `
+                                <div class="one-panel p-6 border-l-[6px] ${isCorrect ? 'border-[#34C759]' : 'border-[#FF3B30]'}">
+                                    <div class="flex gap-3 items-start mb-4">
+                                        <span class="text-[14px] font-[900] ${isCorrect ? 'text-[#34C759]' : 'text-[#FF3B30]'}">Q${i+1}</span>
+                                        <p class="font-[800] text-[16px] text-[#1D1D1F] leading-snug">${q.question}</p>
+                                    </div>
+                                    <div class="one-item p-5 text-[14px] leading-relaxed text-[#5C5C5C]">
+                                        <div class="flex items-center gap-2 mb-2">
+                                            <span class="material-symbols-rounded text-[20px] ${isCorrect ? 'text-[#34C759]' : 'text-[#FF3B30]'}">${isCorrect ? 'check_circle' : 'cancel'}</span>
+                                            <p class="font-[800]">내 선택: ${userAns !== undefined && q.options[userAns] ? q.options[userAns] : '미선택'}</p>
                                         </div>
-                                        <div class="p-5 bg-gray-50 rounded-2xl text-[13px] leading-relaxed text-gray-700">
-                                            <div class="flex items-center gap-2 mb-2">
-                                                <span class="material-symbols-rounded text-lg ${isCorrect ? 'text-green-500' : 'text-red-500'}">${isCorrect ? 'check_circle' : 'cancel'}</span>
-                                                <p class="font-bold">내 선택: ${userAns !== undefined && q.options[userAns] ? q.options[userAns] : '미선택'}</p>
+                                        ${!isCorrect ? `<p class="mb-4 text-[#8E8E93] font-[600]">정답: <span class="text-[#1D1D1F] font-[900] underline decoration-[#007AFF]/30 decoration-4 underline-offset-4">${q.options[correctAns] || '데이터 없음'}</span></p>` : ''}
+                                        
+                                        <hr class="my-4 border-[#E5E5EA]">
+                                        
+                                        <div class="flex flex-col gap-2">
+                                            <span class="text-[12px] font-[900] text-[#007AFF] shrink-0">📝 전체 해설 (답지)</span>
+                                            <div class="text-[13px] text-[#5C5C5C] break-keep leading-relaxed space-y-2 bg-white p-4 rounded-[16px] border border-[#E5E5EA]">
+                                                ${Array.isArray(q.explanations)
+                                                    ? q.explanations.map((exp, idx) => `
+                                                        <p class="${idx === correctAns ? 'text-[#007AFF] font-[800] bg-[#E5F1FF] p-2 rounded-[12px]' : 'font-[600] p-1'}">
+                                                            [${idx + 1}번] ${exp}
+                                                        </p>
+                                                    `).join('')
+                                                    : `<p class="font-[600]">${q.explanations || '등록된 해설이 없습니다.'}</p>`
+                                                }
                                             </div>
-                                            ${!isCorrect ? `<p class="mb-4 text-gray-400">정답: <span class="text-gray-900 font-bold underline underline-offset-4 decoration-indigo-200">${q.options[correctAns] || '데이터 없음'}</span></p>` : ''}
-                                            
-                                            <hr class="mb-4 border-gray-200/50">
-                                            
-                                            <!-- 개선된 전체 해설 표시 영역 -->
-                                            <div class="flex gap-2 flex-col mt-2">
-                                                <span class="text-xs font-black text-indigo-500 shrink-0">📝 전체 해설 (답지)</span>
-                                                <div class="text-[11px] text-gray-600 break-keep leading-relaxed space-y-1.5 bg-white p-4 rounded-xl border border-gray-100">
-                                                    ${Array.isArray(q.explanations)
-                                                        ? q.explanations.map((exp, idx) => `
-                                                            <p class="${idx === correctAns ? 'text-indigo-700 font-bold bg-indigo-50/50 p-1.5 rounded-lg' : 'text-gray-500 p-1'}">
-                                                                [선지 ${idx + 1}] ${exp}
-                                                            </p>
-                                                        `).join('')
-                                                        : `<p>${q.explanations || '등록된 해설이 없습니다.'}</p>`
-                                                    }
-                                                </div>
-                                            </div>
-
                                         </div>
                                     </div>
-                                    `;
-                                }).join('')}
-                            </div>
-                            <button onclick="router.navigate('profile')" class="w-full bg-gray-900 text-white py-5 rounded-[2rem] font-bold shadow-xl">닫기 (기록실로 이동)</button>
+                                </div>
+                                `;
+                            }).join('')}
                         </div>
+                        <button onclick="router.navigate('profile')" class="w-full bg-[#1D1D1F] text-white py-5 rounded-[32px] font-[900] text-[17px] shadow-xl btn-press mt-8">닫기 (기록실로 이동)</button>
                     `;
                 } else if (window.state.currentView === 'profile') {
                     const myResults = window.state.results
@@ -545,168 +546,156 @@
                     const myBest = [...myResults].sort((a,b) => b.score - a.score)[0];
 
                     content.innerHTML = `
-                        <div class="space-y-8 pb-10">
-                            <div class="flex justify-between items-center">
-                                <h2 class="text-2xl font-black">나의 학습 기록</h2>
-                                <button onclick="ui.logout()" class="text-red-400 font-bold text-xs bg-red-50 px-3 py-1.5 rounded-full">로그아웃</button>
+                        <div class="flex justify-between items-center mb-6">
+                            <h2 class="text-[24px] font-[900]">나의 학습 기록</h2>
+                            <button onclick="ui.logout()" class="text-[#FF3B30] font-[800] text-[12px] bg-[#FF3B30]/10 px-4 py-2 rounded-full btn-press">로그아웃</button>
+                        </div>
+                        
+                        <div class="grid grid-cols-2 gap-4 mb-8">
+                            <div class="one-panel p-6 bg-[#007AFF] text-white">
+                                <p class="text-[11px] font-[800] text-blue-200 uppercase mb-1">최고 달성 점수</p>
+                                <p class="text-[32px] font-[900]">${myBest ? myBest.score : '0'}<span class="text-[16px] ml-1 text-blue-200">점</span></p>
                             </div>
-                            
-                            <div class="grid grid-cols-2 gap-3">
-                                <div class="bg-gradient-to-br from-[#0048e3] to-[#3a75ff] text-white p-6 rounded-[2rem] shadow-lg shadow-blue-200">
-                                    <p class="text-[10px] font-bold text-blue-100 uppercase mb-1">최고 달성 점수</p>
-                                    <p class="text-3xl font-black">${myBest ? myBest.score : '0'}<span class="text-sm ml-1 text-blue-200">점</span></p>
-                                </div>
-                                <div class="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100">
-                                    <p class="text-[10px] font-bold text-gray-400 uppercase mb-1">누적 응시 횟수</p>
-                                    <p class="text-3xl font-black text-gray-800">${myResults.length}<span class="text-sm ml-1 text-gray-300">회</span></p>
-                                </div>
+                            <div class="one-panel p-6">
+                                <p class="text-[11px] font-[800] text-[#8E8E93] uppercase mb-1">누적 응시 횟수</p>
+                                <p class="text-[32px] font-[900] text-[#1D1D1F]">${myResults.length}<span class="text-[16px] ml-1 text-[#8E8E93]">회</span></p>
                             </div>
+                        </div>
 
-                            <div class="space-y-4">
-                                <div class="flex items-center justify-between px-2">
-                                    <p class="text-xs font-black text-gray-400 uppercase tracking-widest">Past Exam History</p>
+                        <div class="space-y-4">
+                            <h3 class="text-[14px] font-[900] text-[#8E8E93] px-2 mb-2">과거 응시 내역</h3>
+                            ${myResults.length === 0 ? `
+                                <div class="one-item py-16 text-center border-2 border-dashed border-[#E5E5EA]">
+                                    <span class="material-symbols-rounded text-[#C7C7CC] text-[48px] mb-2">history</span>
+                                    <p class="text-[#8E8E93] text-[14px] font-[800]">아직 응시한 기록이 없습니다.</p>
                                 </div>
-                                ${myResults.length === 0 ? `
-                                    <div class="bg-gray-50 rounded-[2.5rem] py-16 text-center border border-dashed border-gray-200">
-                                        <span class="material-symbols-rounded text-gray-300 text-5xl mb-2">history</span>
-                                        <p class="text-gray-400 text-sm font-bold">아직 응시한 기록이 없습니다.</p>
+                            ` : myResults.map((r, i) => `
+                                <button onclick="ui.viewPastResult('${r.id}')" class="w-full one-panel p-6 flex justify-between items-center btn-press text-left border-2 border-transparent active:border-[#007AFF]/20">
+                                    <div class="flex items-center gap-4">
+                                        <div class="w-12 h-12 rounded-[16px] bg-[#E5F1FF] flex flex-col items-center justify-center text-[#007AFF]">
+                                            <span class="text-[9px] font-[900] uppercase leading-none mb-1">SCORE</span>
+                                            <span class="font-[900] text-[16px] leading-none">${r.score}</span>
+                                        </div>
+                                        <div>
+                                            <p class="font-[900] text-[16px] text-[#1D1D1F] leading-tight">${r.examTitle || '이전 모의고사'}</p>
+                                            <p class="text-[11px] text-[#8E8E93] font-[800] uppercase mt-1">${r.timestamp?.toDate().toLocaleString() || '방금 전'}</p>
+                                        </div>
                                     </div>
-                                ` : myResults.map((r, i) => `
-                                    <button onclick="ui.viewPastResult('${r.id}')" class="w-full bg-white p-5 rounded-[2rem] flex justify-between items-center shadow-sm border border-transparent hover:border-indigo-100 active:scale-[0.98] transition-all text-left">
-                                        <div class="flex items-center gap-4">
-                                            <div class="w-12 h-12 rounded-[1.2rem] bg-indigo-50 flex flex-col items-center justify-center text-indigo-400">
-                                                <span class="text-[9px] font-black uppercase leading-none mb-0.5">SCORE</span>
-                                                <span class="font-black text-indigo-600 leading-none">${r.score}</span>
-                                            </div>
-                                            <div>
-                                                <p class="font-black text-gray-800 leading-tight">${r.examTitle || '이전 모의고사'}</p>
-                                                <p class="text-[10px] text-gray-400 font-bold uppercase mt-1">${r.timestamp?.toDate().toLocaleString() || '방금 전'}</p>
-                                            </div>
-                                        </div>
-                                        <div class="text-right pl-2">
-                                            <span class="material-symbols-rounded text-gray-300">chevron_right</span>
-                                        </div>
-                                    </button>
-                                `).join('')}
-                            </div>
+                                    <div class="text-[#C7C7CC]">
+                                        <span class="material-symbols-rounded">chevron_right</span>
+                                    </div>
+                                </button>
+                            `).join('')}
                         </div>
                     `;
                 } else if (window.state.currentView === 'admin_manage') {
                     content.innerHTML = `
-                        <div class="space-y-6">
-                            <div class="flex justify-between items-center">
-                                <h2 class="text-2xl font-black">Admin Console</h2>
-                                <button onclick="window.state.isAdmin=false; router.navigate('home')" class="text-gray-400"><span class="material-symbols-rounded">logout</span></button>
-                            </div>
-                            <div class="flex gap-2 p-1 bg-gray-100 rounded-[2rem]">
-                                <button onclick="router.navigate('admin_manage')" class="flex-1 py-3 bg-white rounded-full font-bold shadow-sm">시험 및 문항</button>
-                                <button onclick="router.navigate('admin_results')" class="flex-1 py-3 text-gray-400 font-bold">전체 성적</button>
-                            </div>
-                            
-                            <!-- 새 시험 등록 블록 -->
-                            <div class="bg-white p-6 rounded-[2.5rem] shadow-sm space-y-4 border border-indigo-50">
-                                <p class="text-[10px] font-bold text-gray-400 px-2 uppercase tracking-widest">새 시험 등록 (JSON, 정답 인덱스 0~4 기준)</p>
-                                <input type="text" id="exam-title-input" placeholder="시험 제목 (예: 제 1회 한국사 모의고사)" class="w-full bg-[#f9f9f9] rounded-3xl p-4 text-sm font-bold outline-none border-none focus:ring-2 focus:ring-[#d0bcff]">
-                                <textarea id="json-input" placeholder='[{"question": "...", "options": [...], "answer": 0, "explanations": [...]}]' 
-                                    class="w-full h-24 bg-[#f9f9f9] rounded-3xl p-4 text-[10px] font-mono outline-none border-none focus:ring-2 focus:ring-[#d0bcff]"></textarea>
-                                <button onclick="ui.addExam()" class="w-full bg-[#6750a4] text-white py-4 rounded-3xl font-bold active:scale-95 transition-all text-sm shadow-lg">시험 데이터 생성</button>
-                            </div>
+                        <div class="flex justify-between items-center mb-6">
+                            <h2 class="text-[24px] font-[900]">Admin Console</h2>
+                            <button onclick="window.state.isAdmin=false; router.navigate('home')" class="text-[#8E8E93] btn-press"><span class="material-symbols-rounded">logout</span></button>
+                        </div>
+                        <div class="flex gap-2 p-1.5 one-item mb-8">
+                            <button onclick="router.navigate('admin_manage')" class="flex-1 py-3 bg-white rounded-[20px] font-[900] text-[14px] shadow-sm">시험 및 문항</button>
+                            <button onclick="router.navigate('admin_results')" class="flex-1 py-3 text-[#8E8E93] font-[800] text-[14px]">전체 성적</button>
+                        </div>
+                        
+                        <div class="one-panel p-8 mb-8 border border-[#E5F1FF]">
+                            <h3 class="text-[14px] font-[900] text-[#007AFF] mb-4">새 시험 등록 (JSON)</h3>
+                            <input type="text" id="exam-title-input" placeholder="시험 제목 (예: 제 1회 모의고사)" class="w-full one-item p-4 text-[14px] font-[800] outline-none border-2 border-transparent focus:border-[#007AFF] mb-3">
+                            <textarea id="json-input" placeholder='[{"question": "...", "options": [...], "answer": 0, "explanations": [...]}]' 
+                                class="w-full h-32 one-item p-4 text-[12px] font-mono outline-none border-2 border-transparent focus:border-[#007AFF] mb-4"></textarea>
+                            <button onclick="ui.addExam()" class="w-full bg-[#007AFF] text-white py-4 rounded-full font-[900] text-[15px] shadow-lg btn-press">시험 생성하기</button>
+                        </div>
 
-                            <div class="space-y-4">
-                                <p class="text-[10px] font-bold text-gray-400 px-2 uppercase tracking-widest">등록된 시험 목록 (${window.state.exams.length})</p>
-                                ${window.state.exams.length === 0 ? '<p class="text-center py-10 text-gray-300">등록된 시험이 없습니다.</p>' : ''}
-                                ${window.state.exams.map(exam => `
-                                    <div class="bg-white p-5 rounded-[2rem] shadow-sm">
-                                        <div class="flex justify-between items-center mb-3 pb-3 border-b border-gray-100">
-                                            <div>
-                                                <h3 class="font-black text-gray-800 text-lg">${exam.title}</h3>
-                                                <p class="text-[10px] text-gray-400 font-bold mt-1">총 ${exam.questions.length}문항</p>
-                                            </div>
-                                            <button onclick="ui.deleteExam('${exam.id}')" class="text-red-400 bg-red-50 p-2 rounded-xl"><span class="material-symbols-rounded">delete</span></button>
+                        <div class="space-y-4">
+                            <h3 class="text-[14px] font-[900] text-[#8E8E93] px-2 mb-2">등록된 시험 목록 (${window.state.exams.length})</h3>
+                            ${window.state.exams.length === 0 ? '<div class="one-panel py-10 text-center text-[#8E8E93] font-[800]">등록된 시험이 없습니다.</div>' : ''}
+                            ${window.state.exams.map(exam => `
+                                <div class="one-panel p-6">
+                                    <div class="flex justify-between items-center mb-4 pb-4 border-b border-[#E5E5EA]">
+                                        <div>
+                                            <h3 class="font-[900] text-[#1D1D1F] text-[18px]">${exam.title}</h3>
+                                            <p class="text-[12px] text-[#8E8E93] font-[800] mt-1">총 ${exam.questions.length}문항</p>
                                         </div>
-                                        <div class="space-y-2">
-                                            ${exam.questions.map((q, idx) => `
-                                                <div class="bg-gray-50 p-3 rounded-2xl flex justify-between items-center gap-2">
-                                                    <span class="text-xs font-black text-indigo-300">#${idx+1}</span>
-                                                    <div class="flex-1 truncate">
-                                                        <span class="text-[10px] font-black text-indigo-500 mr-1 bg-indigo-100 px-1 rounded">정답: ${Number(q.answer) + 1}번</span>
-                                                        <span class="text-xs font-bold text-gray-600">${q.question}</span>
-                                                    </div>
-                                                    <button onclick="ui.openEditModal('${exam.id}', ${idx})" class="text-indigo-500 bg-indigo-50 p-1.5 rounded-lg"><span class="material-symbols-rounded text-sm">edit</span></button>
-                                                </div>
-                                            `).join('')}
-                                        </div>
+                                        <button onclick="ui.deleteExam('${exam.id}')" class="text-[#FF3B30] bg-[#FF3B30]/10 p-2 rounded-full btn-press"><span class="material-symbols-rounded">delete</span></button>
                                     </div>
-                                `).join('')}
-                            </div>
+                                    <div class="space-y-3">
+                                        ${exam.questions.map((q, idx) => `
+                                            <div class="one-item p-4 flex justify-between items-center gap-3">
+                                                <span class="text-[12px] font-[900] text-[#007AFF]">#${idx+1}</span>
+                                                <div class="flex-1 truncate">
+                                                    <span class="text-[10px] font-[900] text-white bg-[#007AFF] px-2 py-0.5 rounded mr-2">정답: ${Number(q.answer) + 1}번</span>
+                                                    <span class="text-[14px] font-[600] text-[#5C5C5C]">${q.question}</span>
+                                                </div>
+                                                <button onclick="ui.openEditModal('${exam.id}', ${idx})" class="text-[#007AFF] bg-[#E5F1FF] p-2 rounded-xl btn-press"><span class="material-symbols-rounded text-[18px]">edit</span></button>
+                                            </div>
+                                        `).join('')}
+                                    </div>
+                                </div>
+                            `).join('')}
                         </div>
                     `;
                 } else if (window.state.currentView === 'admin_results') {
                     content.innerHTML = `
-                        <div class="space-y-6">
-                            <div class="flex justify-between items-center">
-                                <h2 class="text-2xl font-black">전체 응시 데이터</h2>
-                                <button onclick="window.state.isAdmin=false; router.navigate('home')" class="text-gray-400"><span class="material-symbols-rounded">logout</span></button>
-                            </div>
-                            <div class="flex gap-2 p-1 bg-gray-100 rounded-[2rem]">
-                                <button onclick="router.navigate('admin_manage')" class="flex-1 py-3 text-gray-400 font-bold">시험 및 문항</button>
-                                <button onclick="router.navigate('admin_results')" class="flex-1 py-3 bg-white rounded-full font-bold shadow-sm">전체 성적</button>
-                            </div>
-                            <div class="space-y-3">
-                                ${window.state.results.length === 0 ? '<p class="text-center py-20 text-gray-300 font-bold">기록이 없습니다.</p>' : ''}
-                                ${window.state.results.sort((a,b) => {
-                                    if(!a.timestamp) return -1;
-                                    if(!b.timestamp) return 1;
-                                    return b.timestamp.seconds - a.timestamp.seconds;
-                                }).map(r => `
-                                    <div class="bg-white p-5 rounded-[1.8rem] flex justify-between items-center shadow-sm">
-                                        <div class="flex gap-4 items-center">
-                                            <div class="w-12 h-12 bg-gray-100 rounded-2xl flex items-center justify-center font-bold text-indigo-600">${r.studentId.substring(0,2)}</div>
-                                            <div>
-                                                <p class="font-black text-gray-800 text-lg">${r.studentId}</p>
-                                                <p class="text-[10px] text-gray-500 font-bold mb-0.5 truncate max-w-[150px]">${r.examTitle || '이전 모의고사'}</p>
-                                                <p class="text-[9px] text-gray-400 font-bold uppercase tracking-widest">${r.timestamp?.toDate().toLocaleString() || 'Syncing...'}</p>
-                                            </div>
-                                        </div>
-                                        <div class="text-right">
-                                            <p class="text-2xl font-black ${r.score >= 80 ? 'text-[#0048e3]' : 'text-gray-800'}">${r.score}<span class="text-[10px]">점</span></p>
+                        <div class="flex justify-between items-center mb-6">
+                            <h2 class="text-[24px] font-[900]">전체 응시 데이터</h2>
+                            <button onclick="window.state.isAdmin=false; router.navigate('home')" class="text-[#8E8E93] btn-press"><span class="material-symbols-rounded">logout</span></button>
+                        </div>
+                        <div class="flex gap-2 p-1.5 one-item mb-8">
+                            <button onclick="router.navigate('admin_manage')" class="flex-1 py-3 text-[#8E8E93] font-[800] text-[14px]">시험 및 문항</button>
+                            <button onclick="router.navigate('admin_results')" class="flex-1 py-3 bg-white rounded-[20px] font-[900] text-[14px] shadow-sm">전체 성적</button>
+                        </div>
+                        <div class="space-y-4">
+                            ${window.state.results.length === 0 ? '<div class="one-panel py-10 text-center text-[#8E8E93] font-[800]">기록이 없습니다.</div>' : ''}
+                            ${window.state.results.sort((a,b) => {
+                                if(!a.timestamp) return -1;
+                                if(!b.timestamp) return 1;
+                                return b.timestamp.seconds - a.timestamp.seconds;
+                            }).map(r => `
+                                <div class="one-panel p-6 flex justify-between items-center">
+                                    <div class="flex gap-4 items-center">
+                                        <div class="w-14 h-14 one-item flex items-center justify-center font-[900] text-[18px] text-[#007AFF]">${r.studentId.substring(0,2)}</div>
+                                        <div>
+                                            <p class="font-[900] text-[#1D1D1F] text-[18px]">${r.studentId}</p>
+                                            <p class="text-[12px] text-[#5C5C5C] font-[800] mb-0.5 truncate max-w-[150px]">${r.examTitle || '이전 모의고사'}</p>
+                                            <p class="text-[10px] text-[#8E8E93] font-[800] uppercase tracking-widest">${r.timestamp?.toDate().toLocaleString() || 'Syncing...'}</p>
                                         </div>
                                     </div>
-                                `).join('')}
-                            </div>
+                                    <div class="text-right">
+                                        <p class="text-[28px] font-[900] ${r.score >= 80 ? 'text-[#007AFF]' : 'text-[#1D1D1F]'}">${r.score}<span class="text-[14px]">점</span></p>
+                                    </div>
+                                </div>
+                            `).join('')}
                         </div>
                     `;
                 } else if (window.state.currentView === 'quiz') {
                     content.innerHTML = `
+                        <h2 class="text-[24px] font-[900] mb-6">시험 센터</h2>
                         <div class="space-y-6">
-                            <h2 class="text-2xl font-black">시험 센터</h2>
-                            
-                            <div class="space-y-4">
-                                ${window.state.exams.length === 0 ? `
-                                    <div class="bg-white p-10 rounded-[2.5rem] shadow-sm text-center">
-                                        <p class="text-gray-400 font-bold">현재 진행 중인 시험이 없습니다.</p>
-                                    </div>
-                                ` : window.state.exams.map(exam => `
-                                    <div class="bg-white p-6 rounded-[2.5rem] shadow-sm border border-gray-50">
-                                        <div class="flex justify-between items-start mb-4">
-                                            <div>
-                                                <span class="inline-block px-3 py-1 bg-indigo-50 text-indigo-600 text-[10px] font-black rounded-full mb-2">ACTIVE</span>
-                                                <h3 class="font-black text-gray-800 text-lg leading-tight">${exam.title}</h3>
-                                            </div>
-                                            <div class="w-10 h-10 bg-gray-50 rounded-full flex items-center justify-center text-gray-400">
-                                                <span class="material-symbols-rounded text-lg">description</span>
-                                            </div>
+                            ${window.state.exams.length === 0 ? `
+                                <div class="one-panel py-16 text-center">
+                                    <p class="text-[#8E8E93] font-[800]">현재 진행 중인 시험이 없습니다.</p>
+                                </div>
+                            ` : window.state.exams.map(exam => `
+                                <div class="one-panel p-8">
+                                    <div class="flex justify-between items-start mb-6">
+                                        <div>
+                                            <span class="inline-block px-3 py-1 bg-[#E5F1FF] text-[#007AFF] text-[11px] font-[900] rounded-full mb-3">ACTIVE</span>
+                                            <h3 class="font-[900] text-[#1D1D1F] text-[20px] leading-tight">${exam.title}</h3>
                                         </div>
-                                        <div class="flex items-center gap-4 text-xs font-bold text-gray-500 mb-6">
-                                            <span class="flex items-center gap-1"><span class="material-symbols-rounded text-sm">format_list_numbered</span> ${exam.questions.length}문항</span>
-                                            <span class="flex items-center gap-1"><span class="material-symbols-rounded text-sm">schedule</span> 시간 무제한</span>
+                                        <div class="w-12 h-12 one-item flex items-center justify-center text-[#007AFF]">
+                                            <span class="material-symbols-rounded text-[24px]">description</span>
                                         </div>
-                                        <button onclick="ui.startQuiz('${exam.id}')" class="w-full bg-[#f4f7fc] hover:bg-[#dbe4ff] hover:text-[#0048e3] text-gray-700 py-4 rounded-2xl font-black transition-colors">
-                                            이 시험 응시하기
-                                        </button>
                                     </div>
-                                `).join('')}
-                            </div>
+                                    <div class="flex items-center gap-4 text-[13px] font-[800] text-[#8E8E93] mb-8">
+                                        <span class="flex items-center gap-1"><span class="material-symbols-rounded text-[16px]">format_list_numbered</span> ${exam.questions.length}문항</span>
+                                        <span class="flex items-center gap-1"><span class="material-symbols-rounded text-[16px]">schedule</span> 시간 무제한</span>
+                                    </div>
+                                    <button onclick="ui.startQuiz('${exam.id}')" class="w-full one-item hover:bg-[#E5F1FF] hover:text-[#007AFF] text-[#1D1D1F] py-5 rounded-[32px] font-[900] text-[16px] transition-colors btn-press">
+                                        이 시험 응시하기
+                                    </button>
+                                </div>
+                            `).join('')}
                         </div>
                     `;
                 }
@@ -718,6 +707,26 @@
                 window.state.currentView = view;
                 window.scrollTo(0,0);
                 ui.render();
+            }
+        };
+
+        // Scroll listener for floating bar (Duru Style)
+        window.onscroll = function() {
+            const nav = document.getElementById('nav-container');
+            const wrap = document.getElementById('floating-bar');
+            const texts = document.querySelectorAll('.nav-text');
+            const isScrolled = window.scrollY > 40;
+
+            if (wrap && nav && !wrap.classList.contains('hidden')) {
+                if (isScrolled) {
+                    wrap.style.width = '240px';
+                    nav.style.height = '58px';
+                    texts.forEach(t => t.classList.add('hidden-text'));
+                } else {
+                    wrap.style.width = 'calc(100% - 40px)';
+                    nav.style.height = '76px';
+                    texts.forEach(t => t.classList.remove('hidden-text'));
+                }
             }
         };
 
