@@ -55,8 +55,8 @@
                         <label class="text-[10px] font-bold text-gray-400 block mb-1 uppercase">선지 및 해설</label>
                     </div>
                     <div>
-                        <label class="text-[10px] font-bold text-gray-400 block mb-1 uppercase">정답 번호 (1-5)</label>
-                        <input type="number" id="edit-q-answer" min="1" max="5" class="w-full bg-gray-50 p-3 rounded-xl text-sm border-none outline-none focus:ring-2 focus:ring-indigo-200">
+                        <label class="text-[10px] font-bold text-indigo-400 block mb-1 uppercase">정답 인덱스 (0~4)</label>
+                        <input type="number" id="edit-q-answer" min="0" max="4" class="w-full bg-indigo-50 text-indigo-700 font-bold p-3 rounded-xl text-sm border-none outline-none focus:ring-2 focus:ring-indigo-400">
                     </div>
                 </div>
                 <div class="flex gap-2 mt-6">
@@ -102,10 +102,9 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getFirestore, collection, addDoc, onSnapshot, doc, deleteDoc, updateDoc, serverTimestamp, query, orderBy } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, collection, addDoc, onSnapshot, doc, deleteDoc, updateDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 
-        // Firebase 설정 
         const defaultConfig = {
             apiKey: "AIzaSyDC6tQ3FMdYZ7uNUgLxKfOYELt8FEZ83bg",
             authDomain: "durutester.firebaseapp.com",
@@ -133,17 +132,15 @@
             studentId: localStorage.getItem('duru_student_id') || '',
             isLoggedIn: !!localStorage.getItem('duru_student_id'),
             isAdmin: false,
-            exams: [], // 문항 묶음(시험) 배열
+            exams: [], 
             results: [],
             currentView: 'login',
             titleClicks: 0,
             
-            // 문제 풀이용 상태
             currentExamId: null,
             quizIndex: 0,
             answers: [],
             
-            // 편집/조회용 상태
             editingExamId: null,
             editingQIdx: null,
             viewingResultId: null,
@@ -188,16 +185,20 @@
                 window.state.editingQIdx = qIdx;
 
                 document.getElementById('edit-q-text').value = q.question;
-                document.getElementById('edit-q-answer').value = q.answer;
+                document.getElementById('edit-q-answer').value = q.answer; 
                 
                 const container = document.getElementById('edit-options-container');
                 container.innerHTML = '';
+                
+                // 단일 문자열 해설일 경우를 대비한 배열 변환 처리
+                const explanationsArray = Array.isArray(q.explanations) ? q.explanations : Array(q.options.length).fill(q.explanations || '');
+                
                 q.options.forEach((opt, i) => {
                     const div = document.createElement('div');
                     div.className = "bg-gray-50 p-3 rounded-xl space-y-2 border border-gray-100";
                     div.innerHTML = `
                         <input type="text" value="${opt}" class="opt-val w-full bg-white px-3 py-2 rounded-lg text-xs outline-none border-none focus:ring-1 focus:ring-indigo-200" placeholder="선지 ${i+1}">
-                        <input type="text" value="${q.explanations[i] || ''}" class="exp-val w-full bg-white px-3 py-2 rounded-lg text-[10px] outline-none border-none focus:ring-1 focus:ring-indigo-200" placeholder="해설 ${i+1}">
+                        <input type="text" value="${explanationsArray[i] || ''}" class="exp-val w-full bg-white px-3 py-2 rounded-lg text-[10px] outline-none border-none focus:ring-1 focus:ring-indigo-200" placeholder="해설 ${i+1}">
                     `;
                     container.appendChild(div);
                 });
@@ -219,7 +220,9 @@
                 const options = Array.from(document.querySelectorAll('.opt-val')).map(el => el.value);
                 const explanations = Array.from(document.querySelectorAll('.exp-val')).map(el => el.value);
 
-                if (!questionText || isNaN(answer)) return ui.showToast("내용을 채워주세요.");
+                if (!questionText || isNaN(answer) || answer < 0 || answer >= options.length) {
+                    return ui.showToast(`정확한 정답 인덱스(0~${options.length - 1})를 입력해주세요.`);
+                }
 
                 const updatedQuestions = [...exam.questions];
                 updatedQuestions[qIdx] = {
@@ -300,11 +303,11 @@
                     ui.showToast(`[${title}] 등록 완료!`);
                 } catch (e) {
                     console.error("Add Exam Error:", e);
-                    ui.showToast("등록 실패: " + (e.message.includes("JSON") ? "JSON 형식 오류입니다." : "권한 문제일 수 있습니다. 콘솔을 확인하세요."));
+                    ui.showToast("등록 실패: JSON 형식을 확인해주세요.");
                 }
             },
             deleteExam: (id) => {
-                ui.openConfirm("시험 삭제", "이 시험(문항 묶음)을 전체 삭제하시겠습니까?", async () => {
+                ui.openConfirm("시험 삭제", "이 시험을 전체 삭제하시겠습니까?", async () => {
                     await deleteDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', 'exams', id));
                     ui.showToast("삭제 완료");
                 });
@@ -335,16 +338,18 @@
                 const exam = window.state.exams.find(e => e.id === window.state.currentExamId);
                 let score = 0;
                 
-                // 제출 당시의 문항 데이터 영구 박제 (수정되더라도 기록 유지)
                 const examSnapshot = exam.questions.map(q => ({
                     question: q.question,
                     options: q.options,
-                    answer: q.answer,
+                    answer: q.answer, 
                     explanations: q.explanations || []
                 }));
 
+                // Number() 처리를 통해 타입 불일치 에러 완벽 차단
                 exam.questions.forEach((q, i) => { 
-                    if (q.answer === window.state.answers[i]) score++; 
+                    if (window.state.answers[i] !== undefined && Number(q.answer) === Number(window.state.answers[i])) {
+                        score++; 
+                    }
                 });
                 
                 const finalScore = Math.round((score / exam.questions.length) * 100);
@@ -364,6 +369,7 @@
                     ui.showToast("수고하셨습니다. 제출 완료!");
                     router.navigate('result_detail');
                 } catch(e) {
+                    console.error("Submit Exam Error:", e);
                     ui.showToast("기록 저장 중 오류가 발생했습니다.");
                 }
             },
@@ -454,13 +460,13 @@
                             </div>
                             <div class="space-y-3">
                                 ${q.options.map((opt, i) => `
-                                    <button onclick="ui.selectOption(${i+1})" class="w-full p-5 rounded-[1.8rem] text-left transition-all flex items-center gap-4 ${window.state.answers[window.state.quizIndex] === i + 1 ? 'bg-[#0048e3] text-white shadow-lg' : 'bg-white text-gray-600 shadow-sm'}">
-                                        <span class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${window.state.answers[window.state.quizIndex] === i + 1 ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-400'}">${i + 1}</span>
+                                    <button onclick="ui.selectOption(${i})" class="w-full p-5 rounded-[1.8rem] text-left transition-all flex items-center gap-4 ${window.state.answers[window.state.quizIndex] === i ? 'bg-[#0048e3] text-white shadow-lg' : 'bg-white text-gray-600 shadow-sm'}">
+                                        <span class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${window.state.answers[window.state.quizIndex] === i ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-400'}">${i + 1}</span>
                                         <span class="font-bold text-sm leading-snug">${opt}</span>
                                     </button>
                                 `).join('')}
                             </div>
-                            <button onclick="ui.nextQuestion()" ${!window.state.answers[window.state.quizIndex] ? 'disabled' : ''} 
+                            <button onclick="ui.nextQuestion()" ${window.state.answers[window.state.quizIndex] === undefined ? 'disabled' : ''} 
                                 class="w-full bg-[#0048e3] text-white py-5 rounded-[2rem] font-bold shadow-lg disabled:opacity-20 transition-all mt-4">
                                 ${window.state.quizIndex === exam.questions.length - 1 ? '제출하고 채점하기' : '다음 문제'}
                             </button>
@@ -477,7 +483,7 @@
                         <div class="space-y-8">
                             <div class="flex items-center gap-4">
                                 <button onclick="router.navigate('profile')" class="text-gray-400"><span class="material-symbols-rounded">arrow_back</span></button>
-                                <span class="font-bold text-gray-500 text-sm">오답 노트 및 상세 결과</span>
+                                <span class="font-bold text-gray-500 text-sm">오답 노트 및 전체 해설</span>
                             </div>
                             <div class="text-center py-4">
                                 <p class="text-indigo-400 font-bold text-xs uppercase tracking-widest mb-2">${res.examTitle || '시험 결과'}</p>
@@ -487,7 +493,9 @@
                             <div class="space-y-6">
                                 ${qs.map((q, i) => {
                                     const userAns = res.answers[i];
-                                    const isCorrect = userAns === q.answer;
+                                    const correctAns = Number(q.answer);
+                                    const isCorrect = userAns !== undefined && Number(userAns) === correctAns;
+                                    
                                     return `
                                     <div class="bg-white p-6 rounded-[2.5rem] shadow-sm space-y-4 border-l-8 ${isCorrect ? 'border-green-400' : 'border-red-400'}">
                                         <div class="flex gap-2 items-start">
@@ -497,14 +505,27 @@
                                         <div class="p-5 bg-gray-50 rounded-2xl text-[13px] leading-relaxed text-gray-700">
                                             <div class="flex items-center gap-2 mb-2">
                                                 <span class="material-symbols-rounded text-lg ${isCorrect ? 'text-green-500' : 'text-red-500'}">${isCorrect ? 'check_circle' : 'cancel'}</span>
-                                                <p class="font-bold">내 선택: ${q.options[userAns-1] || '미선택'}</p>
+                                                <p class="font-bold">내 선택: ${userAns !== undefined && q.options[userAns] ? q.options[userAns] : '미선택'}</p>
                                             </div>
-                                            ${!isCorrect ? `<p class="mb-4 text-gray-400">정답: <span class="text-gray-900 font-bold underline underline-offset-4 decoration-indigo-200">${q.options[q.answer-1]}</span></p>` : ''}
+                                            ${!isCorrect ? `<p class="mb-4 text-gray-400">정답: <span class="text-gray-900 font-bold underline underline-offset-4 decoration-indigo-200">${q.options[correctAns] || '데이터 없음'}</span></p>` : ''}
+                                            
                                             <hr class="mb-4 border-gray-200/50">
-                                            <div class="flex gap-2">
-                                                <span class="text-xs font-black text-indigo-400 shrink-0 mt-0.5">해설</span>
-                                                <p class="italic text-gray-500 break-keep leading-relaxed">${(q.explanations && q.explanations[userAns-1]) ? q.explanations[userAns-1] : '선택한 답에 대한 상세 해설이 없습니다.'}</p>
+                                            
+                                            <!-- 개선된 전체 해설 표시 영역 -->
+                                            <div class="flex gap-2 flex-col mt-2">
+                                                <span class="text-xs font-black text-indigo-500 shrink-0">📝 전체 해설 (답지)</span>
+                                                <div class="text-[11px] text-gray-600 break-keep leading-relaxed space-y-1.5 bg-white p-4 rounded-xl border border-gray-100">
+                                                    ${Array.isArray(q.explanations)
+                                                        ? q.explanations.map((exp, idx) => `
+                                                            <p class="${idx === correctAns ? 'text-indigo-700 font-bold bg-indigo-50/50 p-1.5 rounded-lg' : 'text-gray-500 p-1'}">
+                                                                [선지 ${idx + 1}] ${exp}
+                                                            </p>
+                                                        `).join('')
+                                                        : `<p>${q.explanations || '등록된 해설이 없습니다.'}</p>`
+                                                    }
+                                                </div>
                                             </div>
+
                                         </div>
                                     </div>
                                     `;
@@ -584,9 +605,9 @@
                             
                             <!-- 새 시험 등록 블록 -->
                             <div class="bg-white p-6 rounded-[2.5rem] shadow-sm space-y-4 border border-indigo-50">
-                                <p class="text-[10px] font-bold text-gray-400 px-2 uppercase tracking-widest">새 시험 등록 (JSON)</p>
+                                <p class="text-[10px] font-bold text-gray-400 px-2 uppercase tracking-widest">새 시험 등록 (JSON, 정답 인덱스 0~4 기준)</p>
                                 <input type="text" id="exam-title-input" placeholder="시험 제목 (예: 제 1회 한국사 모의고사)" class="w-full bg-[#f9f9f9] rounded-3xl p-4 text-sm font-bold outline-none border-none focus:ring-2 focus:ring-[#d0bcff]">
-                                <textarea id="json-input" placeholder='[{"question": "...", "options": [...], "answer": 1, "explanations": [...]}]' 
+                                <textarea id="json-input" placeholder='[{"question": "...", "options": [...], "answer": 0, "explanations": [...]}]' 
                                     class="w-full h-24 bg-[#f9f9f9] rounded-3xl p-4 text-[10px] font-mono outline-none border-none focus:ring-2 focus:ring-[#d0bcff]"></textarea>
                                 <button onclick="ui.addExam()" class="w-full bg-[#6750a4] text-white py-4 rounded-3xl font-bold active:scale-95 transition-all text-sm shadow-lg">시험 데이터 생성</button>
                             </div>
@@ -607,7 +628,10 @@
                                             ${exam.questions.map((q, idx) => `
                                                 <div class="bg-gray-50 p-3 rounded-2xl flex justify-between items-center gap-2">
                                                     <span class="text-xs font-black text-indigo-300">#${idx+1}</span>
-                                                    <p class="text-xs font-bold text-gray-600 truncate flex-1">${q.question}</p>
+                                                    <div class="flex-1 truncate">
+                                                        <span class="text-[10px] font-black text-indigo-500 mr-1 bg-indigo-100 px-1 rounded">정답: ${Number(q.answer) + 1}번</span>
+                                                        <span class="text-xs font-bold text-gray-600">${q.question}</span>
+                                                    </div>
                                                     <button onclick="ui.openEditModal('${exam.id}', ${idx})" class="text-indigo-500 bg-indigo-50 p-1.5 rounded-lg"><span class="material-symbols-rounded text-sm">edit</span></button>
                                                 </div>
                                             `).join('')}
@@ -701,41 +725,37 @@
             const timeout = setTimeout(() => {
                 if(!window.state.isDataLoaded) {
                     ui.hideLoading();
-                    ui.showToast("데이터 로딩 지연. 오프라인 모드입니다.");
+                    ui.showToast("오프라인 상태로 진입합니다.");
                     router.navigate(window.state.isLoggedIn ? 'home' : 'login');
                 }
-            }, 5000);
+            }, 3000);
 
             try {
-                // 1. Auth 통과 대기 (Rule 3 준수)
                 if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
                     await signInWithCustomToken(auth, __initial_auth_token);
                 } else {
                     await signInAnonymously(auth);
                 }
                 
-                const user = auth.currentUser;
-                if (!user) throw new Error("인증에 실패했습니다.");
+                onAuthStateChanged(auth, (u) => { 
+                    if (!u) return;
                     
-                // 2. 데이터 리스너 등록
-                onSnapshot(eCol, (snap) => {
-                    window.state.exams = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-                    window.state.isDataLoaded = true;
-                    ui.render();
-                    ui.hideLoading();
-                    clearTimeout(timeout);
-                }, (err) => {
-                    console.error("Exams Fetch Error:", err);
-                    ui.showToast("시험 목록 동기화 오류: " + err.code);
-                    ui.hideLoading();
-                    clearTimeout(timeout);
-                });
-                
-                onSnapshot(rCol, (snap) => {
-                    window.state.results = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-                    ui.render();
-                }, (err) => {
-                    console.error("Results Fetch Error:", err);
+                    onSnapshot(eCol, (snap) => {
+                        window.state.exams = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+                        window.state.isDataLoaded = true;
+                        ui.render();
+                        ui.hideLoading();
+                        clearTimeout(timeout);
+                    }, (err) => {
+                        console.error("Exams Fetch Error", err);
+                        ui.hideLoading();
+                        clearTimeout(timeout);
+                    });
+                    
+                    onSnapshot(rCol, (snap) => {
+                        window.state.results = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+                        ui.render();
+                    });
                 });
                 
                 if (!window.state.isLoggedIn) router.navigate('login');
@@ -743,7 +763,6 @@
 
             } catch (e) {
                 console.error("Init error", e);
-                ui.showToast("초기화 실패: " + e.message);
                 ui.hideLoading();
                 clearTimeout(timeout);
             }
