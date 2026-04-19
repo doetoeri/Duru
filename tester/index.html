@@ -105,10 +105,22 @@
         import { getFirestore, collection, addDoc, onSnapshot, doc, deleteDoc, updateDoc, serverTimestamp, query, where } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 
-        // Firebase 설정 파싱 안전하게 처리
-        let firebaseConfig;
+        // 사용자가 제공한 설정을 기본값으로 지정하여 연동 실패를 방지
+        const defaultConfig = {
+            apiKey: "AIzaSyDC6tQ3FMdYZ7uNUgLxKfOYELt8FEZ83bg",
+            authDomain: "durutester.firebaseapp.com",
+            projectId: "durutester",
+            storageBucket: "durutester.firebasestorage.app",
+            messagingSenderId: "1093780593477",
+            appId: "1:1093780593477:web:b7fdfdc6e099e7aedffc2c"
+        };
+
+        // Firebase 설정 파싱 안전하게 처리 (전역 주입값이 있으면 덮어쓰기)
+        let firebaseConfig = defaultConfig;
         try {
-            firebaseConfig = JSON.parse(__firebase_config);
+            if (typeof __firebase_config !== 'undefined' && __firebase_config) {
+                firebaseConfig = JSON.parse(__firebase_config);
+            }
         } catch (e) {
             console.error("Firebase config parse error", e);
         }
@@ -618,13 +630,14 @@
         };
 
         const init = async () => {
-            // 명시적 타임아웃을 두어 네트워크 지연 시에도 최소한 로그인 창은 뜨도록 함
+            // 명시적 타임아웃을 두어 3초 후 강제로 로딩 해제 (무한 로딩 방지)
             const timeout = setTimeout(() => {
                 if(!window.state.isDataLoaded) {
                     ui.hideLoading();
+                    ui.showToast("네트워크 지연으로 오프라인 상태로 시작합니다.");
                     router.navigate(window.state.isLoggedIn ? 'home' : 'login');
                 }
-            }, 5000);
+            }, 3000);
 
             try {
                 // 1. 인증 시작
@@ -639,7 +652,7 @@
                     if (!u) return;
                     
                     // 3. 데이터 리스너 설정
-                    const unsubscribeQ = onSnapshot(qCol, (snap) => {
+                    onSnapshot(qCol, (snap) => {
                         window.state.questions = snap.docs.map(d => ({ id: d.id, ...d.data() }));
                         window.state.isDataLoaded = true;
                         ui.render();
@@ -647,10 +660,11 @@
                         clearTimeout(timeout);
                     }, (err) => {
                         console.error("Q Fetch Error", err);
-                        ui.showToast("데이터를 불러오는 중입니다...");
+                        ui.hideLoading();
+                        clearTimeout(timeout);
                     });
                     
-                    const unsubscribeR = onSnapshot(rCol, (snap) => {
+                    onSnapshot(rCol, (snap) => {
                         window.state.results = snap.docs.map(d => ({ id: d.id, ...d.data() }));
                         ui.render();
                     }, (err) => {
@@ -664,13 +678,18 @@
 
             } catch (e) {
                 console.error("Init error", e);
-                ui.showToast("네트워크 연결을 확인해주세요.");
+                ui.showToast("인증 서버에 연결할 수 없습니다.");
                 ui.hideLoading();
+                clearTimeout(timeout);
             }
         };
 
-        // Window Load 이후 실행
-        window.addEventListener('load', init);
+        // 외부 폰트나 이미지를 기다리지 않고, DOM이 준비되는 즉시 실행하여 로딩 단축
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', init);
+        } else {
+            init();
+        }
     </script>
 </body>
 </html>
