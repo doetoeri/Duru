@@ -2,421 +2,759 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Duru - 실시간 학급 협업</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Duru Tester</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-auth-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore-compat.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@400;600;800;900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&display=swap" rel="stylesheet">
     <style>
-        body { font-family: 'Pretendard', sans-serif; background-color: #F2F2F7; -webkit-tap-highlight-color: transparent; overflow-x: hidden; }
-        .one-panel { background: white; border-radius: 32px; box-shadow: 0 4px 20px rgba(0,0,0,0.02), 0 0 1px rgba(0,0,0,0.05); }
-        .one-item { background: #F2F2F7; border-radius: 24px; }
-        .btn-press:active { transform: scale(0.96); opacity: 0.8; }
-        .btn-press { transition: transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.2s; }
-        .nav-active { background-color: #F2F2F7; color: #000 !important; }
-        .hidden-text { max-height: 0; opacity: 0; margin-top: 0; pointer-events: none; }
+        body { font-family: 'Noto Sans KR', sans-serif; -webkit-tap-highlight-color: transparent; overflow-x: hidden; }
+        .material-symbols-rounded { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+        .active-tab .material-symbols-rounded { font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+        .glass { background: rgba(255, 255, 255, 0.8); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); }
+        .toast-active { transform: translate(-50%, -24px) !important; opacity: 1 !important; }
         .no-scrollbar::-webkit-scrollbar { display: none; }
-        input:focus { outline: none; border-color: #007AFF; }
-        .modal-bg { background: rgba(0,0,0,0.4); backdrop-filter: blur(10px); }
-        
-        .live-badge { display: flex; align-items: center; gap: 6px; background: white; padding: 6px 12px; border-radius: 100px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
-        .pulse-dot { width: 6px; height: 6px; background: #007AFF; border-radius: 50%; animation: pulse 1.5s infinite; }
-        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.3; } 100% { opacity: 1; } }
-        
-        .loader { width: 20px; height: 20px; border: 3px solid #E5E5EA; border-top-color: #007AFF; border-radius: 50%; animation: spin 1s linear infinite; }
-        @keyframes spin { to { transform: rotate(360deg); } }
-
-        /* 권한 오류 안내 박스 */
-        #permission-error { display: none; }
     </style>
 </head>
-<body class="selection:bg-[#E5F1FF]">
+<body class="bg-[#f8f9ff] text-[#1a1c1e] min-h-screen">
 
-    <div id="app" class="min-h-screen flex flex-col max-w-2xl mx-auto relative pb-32">
-        <!-- Header -->
-        <header class="sticky top-0 z-40 bg-[#F2F2F7]/90 backdrop-blur-xl px-6 pt-12 pb-4 flex items-center justify-between">
-            <h1 class="text-[30px] font-[900] tracking-tight">Duru</h1>
-            <div id="status-badge" class="live-badge">
-                <div class="pulse-dot" id="main-dot"></div>
-                <span class="text-[11px] font-[900] text-[#007AFF]" id="status-text">CONNECTING</span>
+    <div id="app" class="max-w-md mx-auto min-h-screen relative pb-32">
+        <!-- Loading Screen -->
+        <div id="loading" class="fixed inset-0 bg-white z-[100] flex flex-col items-center justify-center transition-opacity duration-500">
+            <div class="flex flex-col items-center gap-4">
+                <div class="w-12 h-12 border-4 border-[#dbe4ff] border-t-[#0048e3] rounded-full animate-spin"></div>
+                <p class="text-sm font-bold text-gray-400 animate-pulse">데이터를 동기화 중입니다...</p>
             </div>
-        </header>
-
-        <!-- Permission Error Message -->
-        <div id="permission-error" class="mx-5 mb-5 p-6 bg-red-50 border border-red-100 rounded-[24px]">
-            <h2 class="text-red-600 font-[900] mb-2">데이터 접근 권한 오류</h2>
-            <p class="text-red-500 text-sm font-[600] leading-relaxed">
-                Firebase 콘솔의 <b>Firestore Database -> Rules</b> 설정이 아래와 같이 되어 있는지 확인해 주세요:<br>
-                <code class="block mt-2 p-2 bg-red-100 rounded text-[12px]">allow read, write: if request.auth != null;</code>
-            </p>
         </div>
 
-        <!-- Main Content Area -->
-        <main id="content" class="px-5 space-y-8 mt-4">
-            <div id="loading-view" class="py-20 text-center">
-                <div class="loader mx-auto mb-4"></div>
-                <p class="text-gray-400 font-[800]">서버 연결 중...</p>
-            </div>
-        </main>
+        <!-- In-app Toast -->
+        <div id="toast" class="fixed bottom-0 left-1/2 -translate-x-1/2 mb-24 z-[300] bg-[#313033] text-[#f4f0f4] px-6 py-3 rounded-2xl text-sm shadow-xl opacity-0 transition-all duration-300 pointer-events-none whitespace-nowrap"></div>
 
-        <!-- Floating UI Navigation -->
-        <div id="floating-bar" class="fixed left-1/2 -translate-x-1/2 bottom-6 w-[calc(100%-40px)] transition-all duration-500 z-50">
-            <nav class="bg-white/95 backdrop-blur-2xl shadow-[0_8px_40px_rgba(0,0,0,0.1)] rounded-[100px] flex items-center justify-between p-2 h-[76px] transition-all duration-500" id="nav-container">
-                <button onclick="setTab('home')" class="nav-item flex-1 flex flex-col items-center justify-center h-full rounded-full btn-press relative transition-all" id="btn-home">
-                    <div class="relative z-10"><svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg></div>
-                    <span class="nav-text text-[11px] font-[900] mt-1 relative z-10 transition-all duration-300">홈</span>
-                </button>
-                <button onclick="setTab('time')" class="nav-item flex-1 flex flex-col items-center justify-center h-full rounded-full btn-press relative transition-all" id="btn-time">
-                    <div class="relative z-10"><svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg></div>
-                    <span class="nav-text text-[11px] font-[900] mt-1 relative z-10 transition-all duration-300">시간표</span>
-                </button>
-                <button onclick="setTab('meal')" class="nav-item flex-1 flex flex-col items-center justify-center h-full rounded-full btn-press relative transition-all" id="btn-meal">
-                    <div class="relative z-10"><svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg></div>
-                    <span class="nav-text text-[11px] font-[900] mt-1 relative z-10 transition-all duration-300">급식</span>
-                </button>
-                <button onclick="setTab('class')" class="nav-item flex-1 flex flex-col items-center justify-center h-full rounded-full btn-press relative transition-all" id="btn-class">
-                    <div class="relative z-10"><svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 002-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg></div>
-                    <span class="nav-text text-[11px] font-[900] mt-1 relative z-10 transition-all duration-300">학급</span>
-                </button>
-            </nav>
+        <!-- Global Confirm Modal -->
+        <div id="confirm-modal" class="fixed inset-0 bg-black/40 backdrop-blur-sm z-[250] hidden items-center justify-center p-6">
+            <div class="bg-white w-full max-w-xs rounded-[2.5rem] p-8 shadow-2xl">
+                <h3 id="confirm-title" class="text-xl font-bold mb-2 text-center text-[#1c1b1f]">확인</h3>
+                <p id="confirm-desc" class="text-sm text-gray-500 text-center mb-6">설명이 표시됩니다.</p>
+                <div class="flex gap-2">
+                    <button onclick="ui.closeConfirm()" class="flex-1 py-3 bg-gray-100 rounded-full font-bold text-gray-600">취소</button>
+                    <button id="confirm-btn" class="flex-1 py-3 bg-[#ba1a1a] text-white rounded-full font-bold">확인</button>
+                </div>
+            </div>
         </div>
 
-        <!-- Overlays -->
-        <div id="modal-container" class="fixed inset-0 z-[100] hidden modal-bg flex items-end md:items-center justify-center p-0 md:p-6"></div>
+        <!-- Admin Edit Question Modal -->
+        <div id="edit-modal" class="fixed inset-0 bg-black/40 backdrop-blur-sm z-[200] hidden items-center justify-center p-6 overflow-y-auto">
+            <div class="bg-white w-full max-w-sm rounded-[2.5rem] p-6 shadow-2xl my-auto">
+                <h2 class="text-xl font-bold mb-4">문항 개별 편집</h2>
+                <div class="space-y-3 max-h-[60vh] overflow-y-auto pr-2">
+                    <div>
+                        <label class="text-[10px] font-bold text-gray-400 block mb-1 uppercase">질문 내용</label>
+                        <textarea id="edit-q-text" class="w-full bg-gray-50 p-3 rounded-xl text-sm border-none outline-none focus:ring-2 focus:ring-indigo-200" rows="3"></textarea>
+                    </div>
+                    <div id="edit-options-container" class="space-y-2">
+                        <label class="text-[10px] font-bold text-gray-400 block mb-1 uppercase">선지 및 해설</label>
+                    </div>
+                    <div>
+                        <label class="text-[10px] font-bold text-indigo-400 block mb-1 uppercase">정답 인덱스 (0~4)</label>
+                        <input type="number" id="edit-q-answer" min="0" max="4" class="w-full bg-indigo-50 text-indigo-700 font-bold p-3 rounded-xl text-sm border-none outline-none focus:ring-2 focus:ring-indigo-400">
+                    </div>
+                </div>
+                <div class="flex gap-2 mt-6">
+                    <button onclick="ui.closeEditModal()" class="flex-1 py-3 bg-gray-100 rounded-xl font-bold text-gray-500">닫기</button>
+                    <button id="save-edit-btn" class="flex-1 py-3 bg-[#6750a4] text-white rounded-xl font-bold">저장하기</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Admin Auth Modal -->
+        <div id="admin-modal" class="fixed inset-0 bg-black/40 backdrop-blur-sm z-[200] hidden items-center justify-center p-6">
+            <div class="bg-white w-full max-w-sm rounded-[2.5rem] p-8 shadow-2xl">
+                <h2 class="text-xl font-bold mb-6 text-center text-[#21103e]">관리자 인증</h2>
+                <input type="password" id="admin-pw-input" placeholder="비밀번호" class="w-full bg-[#f3edf7] px-6 py-4 rounded-2xl text-center outline-none border-2 border-transparent focus:border-[#d0bcff] mb-4">
+                <div class="flex gap-3">
+                    <button onclick="ui.closeAdminModal()" class="flex-1 py-4 bg-gray-50 rounded-2xl font-bold text-gray-500">취소</button>
+                    <button onclick="ui.verifyAdmin()" class="flex-1 py-4 bg-[#6750a4] text-white rounded-2xl font-bold">확인</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div id="content" class="p-6 pt-12"></div>
+
+        <!-- Bottom Navigation -->
+        <nav id="navbar" class="fixed bottom-6 left-1/2 -translate-x-1/2 w-[calc(100%-3rem)] max-w-sm z-50 hidden">
+            <div class="glass shadow-[0_8px_32px_rgba(0,0,0,0.06)] rounded-[2.5rem] px-4 py-3 flex justify-between items-center border border-white/50">
+                <button onclick="router.navigate('home')" class="nav-btn flex flex-col items-center gap-1 w-20" data-tab="home">
+                    <div class="icon-box px-5 py-1.5 rounded-full transition-all duration-300"><span class="material-symbols-rounded">home</span></div>
+                    <span class="text-[10px] font-bold">홈</span>
+                </button>
+                <button onclick="router.navigate('quiz')" class="nav-btn flex flex-col items-center gap-1 w-20" data-tab="quiz">
+                    <div class="icon-box px-5 py-1.5 rounded-full transition-all duration-300"><span class="material-symbols-rounded">quiz</span></div>
+                    <span class="text-[10px] font-bold">시험 센터</span>
+                </button>
+                <button onclick="router.navigate('profile')" class="nav-btn flex flex-col items-center gap-1 w-20" data-tab="profile">
+                    <div class="icon-box px-5 py-1.5 rounded-full transition-all duration-300"><span class="material-symbols-rounded">history</span></div>
+                    <span class="text-[10px] font-bold">학습기록</span>
+                </button>
+            </div>
+        </nav>
     </div>
 
-    <script>
-        // --- 1. CONFIGURATION (사용자 제공 설정값) ---
-        const MY_CONFIG = {
-            apiKey: "AIzaSyAP8WRXAjmPdmATfWKnCrCRQNH0ftbBV9w",
-            authDomain: "duru108.firebaseapp.com",
-            projectId: "duru108",
-            storageBucket: "duru108.firebasestorage.app",
-            messagingSenderId: "669255987956",
-            appId: "1:669255987956:web:7479e73d084a2faafb24a1"
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getFirestore, collection, addDoc, onSnapshot, doc, deleteDoc, updateDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+
+        // 사용자 제공 Firebase 설정
+        const defaultConfig = {
+            apiKey: "AIzaSyDC6tQ3FMdYZ7uNUgLxKfOYELt8FEZ83bg",
+            authDomain: "durutester.firebaseapp.com",
+            projectId: "durutester",
+            storageBucket: "durutester.firebasestorage.app",
+            messagingSenderId: "1093780593477",
+            appId: "1:1093780593477:web:b7fdfdc6e099e7aedffc2c"
         };
 
-        const finalConfig = (typeof __firebase_config !== 'undefined' && __firebase_config) ? JSON.parse(__firebase_config) : MY_CONFIG;
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'duru-stable-v1';
-
-        // Firebase Setup
-        firebase.initializeApp(finalConfig);
-        const db = firebase.firestore();
-        const auth = firebase.auth();
-
-        let state = {
-            activeTab: 'home',
-            data: { 
-                announcements: [], schedules: [], materials: [], planner: [], 
-                memos: {}, meals: {}, timetables: {} 
-            },
-            dates: getDates(),
-            syncStarted: false
-        };
-
-        function getDates() {
-            const now = new Date();
-            const kst = new Date(now.getTime() + (9 * 60 * 60 * 1000));
-            const f = (d) => {
-                const year = d.getUTCFullYear();
-                const month = String(d.getUTCMonth() + 1).padStart(2, '0');
-                const date = String(d.getUTCDate()).padStart(2, '0');
-                return { str: `${year}-${month}-${date}` };
-            };
-            return { tdStr: f(kst).str, tmStr: f(new Date(kst.getTime() + 86400000)).str };
-        }
-
-        // --- 2. AUTH & SYNC ENGINE ---
-        async function init() {
-            const statusText = document.getElementById('status-text');
-            const mainDot = document.getElementById('main-dot');
-
-            try {
-                // RULE 3: Auth Before Queries - 익명 인증 시도 및 확인
-                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                    await auth.signInWithCustomToken(__initial_auth_token);
-                } else if (!auth.currentUser) {
-                    await auth.signInAnonymously();
-                }
-
-                // 인증 상태 리스너
-                auth.onAuthStateChanged(user => {
-                    if (user) {
-                        statusText.innerText = "LIVE";
-                        mainDot.style.backgroundColor = "#007AFF";
-                        // 인증 완료된 후 최초 1회만 데이터 구독 시작
-                        if (!state.syncStarted) {
-                            state.syncStarted = true;
-                            startSync(user);
-                        }
-                    } else {
-                        statusText.innerText = "AUTHENTICATING...";
-                        mainDot.style.backgroundColor = "#FF9500";
-                    }
-                });
-            } catch (e) {
-                statusText.innerText = "AUTH ERROR";
-                mainDot.style.backgroundColor = "#FF3B30";
-                console.error("Auth Exception:", e);
+        let firebaseConfig = defaultConfig;
+        try {
+            if (typeof __firebase_config !== 'undefined' && __firebase_config) {
+                firebaseConfig = JSON.parse(__firebase_config);
             }
-            render();
+        } catch (e) {
+            console.error("Firebase config parse error", e);
         }
 
-        function startSync(user) {
-            // RULE 1: Strict Paths
-            const pub = (col) => db.collection('artifacts').doc(appId).collection('public').doc('data').collection(col);
-            const priv = (col) => db.collection('artifacts').doc(appId).collection('users').doc(user.uid).collection(col);
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+        const APP_ID = typeof __app_id !== 'undefined' ? __app_id : 'durutester';
 
-            const handleError = (colName) => (err) => {
-                console.error(`Sync Error [${colName}]:`, err.message);
-                if (err.code === 'permission-denied') {
-                    document.getElementById('permission-error').style.display = 'block';
-                    document.getElementById('status-text').innerText = "RESTRICTED";
-                }
-            };
-
-            // 데이터 실시간 감시 시작
-            pub('announcements').onSnapshot(s => { 
-                state.data.announcements = s.docs.map(d=>({id:d.id, ...d.data()})).sort((a,b)=>b.at-a.at); 
-                render(); 
-            }, handleError('announcements'));
-
-            pub('schedules').onSnapshot(s => { 
-                state.data.schedules = s.docs.map(d=>({id:d.id, ...d.data()})).sort((a,b)=>new Date(a.date)-new Date(b.date)); 
-                render(); 
-            }, handleError('schedules'));
-
-            pub('materials').onSnapshot(s => { 
-                state.data.materials = s.docs.map(d=>({id:d.id, ...d.data()})).sort((a,b)=>b.at-a.at); 
-                render(); 
-            }, handleError('materials'));
-
-            pub('memos').onSnapshot(s => { 
-                s.docs.forEach(d=>state.data.memos[d.id]=d.data().content); 
-                render(); 
-            }, handleError('memos'));
-
-            pub('meals').onSnapshot(s => { 
-                s.docs.forEach(d=>state.data.meals[d.id]=d.data().menu); 
-                render(); 
-            }, handleError('meals'));
-
-            pub('timetables').onSnapshot(s => { 
-                s.docs.forEach(d=>state.data.timetables[d.id]=d.data().periods); 
-                render(); 
-            }, handleError('timetables'));
-
-            priv('planner').onSnapshot(s => { 
-                state.data.planner = s.docs.map(d=>({id:d.id, ...d.data()})).sort((a,b)=>b.at-a.at); 
-                render(); 
-            }, handleError('planner'));
-        }
-
-        // --- 3. UI RENDERING ---
-        function setTab(tab) {
-            state.activeTab = tab;
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-            render();
-        }
-
-        function render() {
-            const container = document.getElementById('content');
-            if (!container) return;
-            const tab = state.activeTab;
-
-            document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('nav-active'));
-            const btn = document.getElementById(`btn-${tab}`);
-            if (btn) btn.classList.add('nav-active');
-
-            let html = '';
-            if (tab === 'home') html = renderHome();
-            else if (tab === 'time') html = renderTime();
-            else if (tab === 'meal') html = renderMeal();
-            else if (tab === 'class') html = renderClass();
-
-            container.innerHTML = html;
-        }
-
-        function renderHome() {
-            const meal = state.data.meals[state.dates.tdStr];
-            const nextEvt = (state.data.schedules || []).filter(s => new Date(s.date) >= new Date(state.dates.tdStr))[0];
-
-            return `
-                <div class="one-panel p-8">
-                    <div class="flex justify-between items-center mb-6"><h2 class="font-[900] text-[24px]">학급 알림</h2><button onclick="openInputModal('NOTICE')" class="btn-press text-[#007AFF] font-[900] text-sm bg-[#F2F2F7] px-4 py-2 rounded-full">작성</button></div>
-                    <div class="space-y-4">${(state.data.announcements || []).length ? state.data.announcements.slice(0,2).map(a => `
-                        <div class="one-item p-6 border border-white shadow-sm">
-                            <h3 class="font-[900] text-[17px]">${a.title || '제목 없음'}</h3>
-                            <p class="text-[14px] text-[#5C5C5C] mt-2 font-[600] leading-relaxed">${a.content || '내용 없음'}</p>
-                        </div>
-                    `).join('') : '<p class="text-center text-gray-400 py-6 font-[600]">새로운 공지사항이 없습니다.</p>'}</div>
-                </div>
-                <div class="one-panel p-8 text-center bg-gradient-to-br from-[#007AFF]/10 to-white min-h-[140px] flex flex-col justify-center">
-                    <p class="text-[12px] font-[900] text-[#007AFF] mb-1 tracking-widest uppercase">다가오는 일정</p>
-                    <div class="font-[900] text-[22px] text-[#1D1D1F]">${nextEvt ? nextEvt.title : '등록된 일정 없음'}</div>
-                    ${nextEvt ? `<p class="text-[13px] font-[800] text-[#8E8E93] mt-1">${nextEvt.date}</p>` : ''}
-                </div>
-                <div class="one-panel p-8">
-                    <div class="flex justify-between items-center mb-6"><h3 class="font-[900] text-[22px]">오늘의 점심 🍱</h3><button onclick="openInputModal('MEAL', '${state.dates.tdStr}')" class="text-[#007AFF] font-[900] text-sm">입력</button></div>
-                    <div class="one-item p-6 flex flex-wrap justify-center gap-2">
-                        ${meal ? meal.split(',').map(m => `<span class="bg-white px-4 py-1.5 rounded-full text-[15px] font-[900] shadow-sm">${m.trim()}</span>`).join('') : '<p class="text-gray-400 font-[800] py-4 text-center w-full">오늘의 메뉴를 입력해 보세요.</p>'}
-                    </div>
-                </div>
-            `;
-        }
-
-        function renderTime() {
-            const list = state.data.timetables[state.dates.tdStr] || [];
-            return `
-                <div class="one-panel p-2 flex mb-6 shadow-inner bg-[#F2F2F7]"><div class="flex-1 py-3 text-center rounded-[24px] bg-white shadow-sm font-[900]">오늘 시간표</div></div>
-                <div class="space-y-4">
-                    <button onclick="openInputModal('TIME', '${state.dates.tdStr}')" class="w-full py-5 one-panel text-[#007AFF] font-[900] text-lg border-2 border-dashed border-[#007AFF]/20 flex items-center justify-center gap-3">전체 시간표 편집</button>
-                    ${list.length ? list.map((t, idx) => `
-                        <div class="one-panel p-6 flex items-center justify-between transition-all hover:translate-y-[-2px]">
-                            <div class="flex items-center gap-6">
-                                <div class="w-12 h-12 one-item flex items-center justify-center font-[900] text-[22px] text-[#007AFF]">${idx+1}</div>
-                                <div><h4 class="font-[900] text-[19px]">${t}</h4>${state.data.memos[state.dates.tdStr+'_'+(idx+1)] ? `<p class="text-[13px] text-[#007AFF] font-[900] mt-1">💡 ${state.data.memos[state.dates.tdStr+'_'+(idx+1)]}</p>` : ''}</div>
-                            </div>
-                            <button onclick="openInputModal('MEMO', '${state.dates.tdStr}_${idx+1}')" class="btn-press text-gray-300"><svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 4v16m8-8H4"/></svg></button>
-                        </div>
-                    `).join('') : '<div class="one-panel p-20 text-center text-gray-400 font-[900]">등록된 시간표 정보가 없습니다.</div>'}
-                </div>
-            `;
-        }
-
-        function renderMeal() {
-            const Card = (d, title) => {
-                const m = state.data.meals[d];
-                return `
-                    <div class="one-panel p-8 mb-8">
-                        <div class="flex justify-between items-center mb-6"><h2 class="text-[22px] font-[900]">${title}</h2><button onclick="openInputModal('MEAL', '${d}')" class="text-[#007AFF] font-[900] text-sm bg-[#F2F2F7] px-4 py-2 rounded-full">편집</button></div>
-                        <div class="one-item p-8 flex flex-wrap justify-center gap-2">
-                            ${m ? m.split(',').map(it => `<span class="bg-white px-5 py-2 rounded-full text-[16px] font-[900] shadow-sm">${it.trim()}</span>`).join('') : '<p class="text-gray-400 font-[800] py-6 text-center w-full">정보가 없습니다.</p>'}
-                        </div>
-                    </div>
-                `;
-            }
-            return Card(state.dates.tdStr, "오늘의 점심") + Card(state.dates.tmStr, "내일의 점심");
-        }
-
-        function renderClass() {
-            return `
-                <div class="space-y-8 pb-10">
-                    <div class="one-panel p-8">
-                        <div class="flex justify-between items-center mb-6"><h2 class="text-[22px] font-[900]">내 플래너</h2><button onclick="openInputModal('PLAN_ADD')" class="btn-press bg-[#007AFF] text-white w-9 h-9 rounded-full flex items-center justify-center font-bold text-xl">+</button></div>
-                        <div class="space-y-4">
-                            ${(state.data.planner || []).length ? state.data.planner.map(t => `
-                                <div class="bg-white border border-[#E5E5EA] rounded-[24px] p-5 flex items-center justify-between shadow-sm">
-                                    <button onclick="togglePlanner('${t.id}', ${!t.done})" class="flex items-center gap-4 flex-1 text-left">
-                                        <div class="w-7 h-7 rounded-full border-2 flex items-center justify-center ${t.done ? 'bg-[#007AFF] border-[#007AFF] text-white' : 'border-[#D1D1D6] text-transparent'}"><svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg></div>
-                                        <span class="font-[900] text-[16px] ${t.done ? 'line-through text-gray-400' : ''}">${t.text}</span>
-                                    </button>
-                                    <button onclick="deleteDoc('planner', '${t.id}', true)" class="text-red-400 p-2 font-bold">×</button>
-                                </div>
-                            `).join('') : '<p class="text-center text-gray-400 py-6 font-[800]">오늘의 계획을 세워보세요.</p>'}
-                        </div>
-                    </div>
-                    <div class="one-panel p-8">
-                        <div class="flex justify-between items-center mb-6"><h2 class="text-[22px] font-[900]">통합 일정</h2><button onclick="openInputModal('SCHED')" class="text-[#007AFF] font-[900] bg-[#F2F2F7] px-4 py-2 rounded-full text-sm">일정 추가</button></div>
-                        <div class="space-y-4">${(state.data.schedules || []).length ? state.data.schedules.map(s => `<div class="one-item p-5 flex justify-between items-center relative group"><div><h3 class="font-[900]">${s.title}</h3><p class="text-[12px] font-[800] text-[#8E8E93] mt-1">${s.date}</p></div><button onclick="deleteDoc('schedules', '${s.id}')" class="text-red-400 p-2">×</button></div>`).join('') : '<p class="text-center text-gray-400 py-6 font-[600]">예정된 일정이 없습니다.</p>'}</div>
-                    </div>
-                    <div class="one-panel p-8">
-                        <div class="flex justify-between items-center mb-6"><h2 class="text-[22px] font-[900]">자료 보관함</h2><button onclick="openInputModal('FILE')" class="text-[#007AFF] font-[900] bg-[#F2F2F7] px-4 py-2 rounded-full text-sm">공유</button></div>
-                        <div class="grid gap-4">${(state.data.materials || []).length ? state.data.materials.map(m => `<a href="${m.link}" target="_blank" class="one-item p-5 flex items-center justify-between shadow-sm border border-white"><div><h3 class="font-[900]">${m.title}</h3><p class="text-[12px] font-[800] text-[#8E8E93]">${m.subject}</p></div><button onclick="event.preventDefault(); deleteDoc('materials', '${m.id}')" class="text-red-400 p-2">×</button></a>`).join('') : '<p class="text-center text-gray-400 py-6 font-[600]">공유된 자료가 아직 없습니다.</p>'}</div>
-                    </div>
-                </div>
-            `;
-        }
-
-        // --- 4. DATA ACTIONS ---
-        async function togglePlanner(id, done) {
-            const user = auth.currentUser;
-            if (!user) return;
-            await db.collection('artifacts').doc(appId).collection('users').doc(user.uid).collection('planner').doc(id).update({ done });
-        }
-
-        async function deleteDoc(col, id, isPrivate = false) {
-            const user = auth.currentUser;
-            if (!user || !confirm("정말로 삭제하시겠습니까?")) return;
-            const ref = isPrivate ? db.collection('artifacts').doc(appId).collection('users').doc(user.uid).collection(col) : db.collection('artifacts').doc(appId).collection('public').doc('data').collection(col);
-            await ref.doc(id).delete();
-        }
-
-        // --- 5. MODALS & UI HELPERS ---
-        function openInputModal(type, targetId = '') { renderModal('INPUT', { type, targetId }); }
-
-        function renderModal(type, payload = {}) {
-            const mc = document.getElementById('modal-container');
-            mc.classList.remove('hidden');
-            let content = '';
-
-            const title = {NOTICE:'새 공지', SCHED:'일정 등록', FILE:'자료 공유', PLAN_ADD:'할 일 추가', MEMO:'수업 메모', MEAL:'식단 입력', TIME:'시간표 편집'}[payload.type];
-            content = `
-                <div class="one-panel w-full max-w-md p-8 m-4 rounded-t-[40px] md:rounded-[40px] animate-in slide-in-from-bottom duration-300">
-                    <h3 class="text-[22px] font-[900] mb-8 text-center">${title}</h3>
-                    <div class="space-y-4">
-                        ${payload.type === 'PLAN_ADD' || payload.type === 'MEMO' || payload.type === 'MEAL' || payload.type === 'TIME' ? `<input id="val-1" placeholder="${payload.type==='MEAL'?'메뉴들을 쉼표로 구분':(payload.type==='TIME'?'과목들을 쉼표로 구분':'내용 입력')}" class="w-full one-input p-5 text-lg">` : ''}
-                        ${payload.type === 'NOTICE' ? `<input id="val-1" placeholder="제목" class="w-full one-input p-5"><textarea id="val-2" placeholder="상세 내용" class="w-full one-input p-5 min-h-[100px]"></textarea>` : ''}
-                        ${payload.type === 'SCHED' ? `<input id="val-1" placeholder="일정 이름" class="w-full one-input p-5"><input id="val-2" type="date" class="w-full one-input p-5">` : ''}
-                        ${payload.type === 'FILE' ? `<input id="val-1" placeholder="자료 이름" class="w-full one-input p-5"><input id="val-2" placeholder="과목" class="w-full one-input p-5"><input id="val-3" placeholder="URL 링크" class="w-full one-input p-5">` : ''}
-                    </div>
-                    <div class="flex gap-4 mt-8">
-                        <button onclick="closeModal()" class="flex-1 one-item py-5 font-[900] text-lg">취소</button>
-                        <button onclick="submitInput('${payload.type}', '${payload.targetId}')" class="flex-1 bg-[#007AFF] text-white py-5 rounded-[28px] font-[900] text-lg shadow-lg">확인</button>
-                    </div>
-                </div>
-            `;
-            mc.innerHTML = content;
-        }
-
-        async function submitInput(type, targetId) {
-            const user = auth.currentUser;
-            if (!user) return alert("인증 처리 중입니다. 잠시만 기다려 주세요.");
-
-            const pub = (col) => db.collection('artifacts').doc(appId).collection('public').doc('data').collection(col);
-            const priv = (col) => db.collection('artifacts').doc(appId).collection('users').doc(user.uid).collection(col);
+        window.state = {
+            studentId: localStorage.getItem('duru_student_id') || '',
+            isLoggedIn: !!localStorage.getItem('duru_student_id'),
+            isAdmin: false,
+            exams: [], 
+            results: [],
+            currentView: 'login',
+            titleClicks: 0,
             
-            try {
-                const v1 = document.getElementById('val-1')?.value;
-                const v2 = document.getElementById('val-2')?.value;
-                const v3 = document.getElementById('val-3')?.value;
+            // 문제 풀이용 상태
+            currentExamId: null,
+            quizIndex: 0,
+            answers: [], // 0~4 인덱스가 저장됨
+            
+            // 편집/조회용 상태
+            editingExamId: null,
+            editingQIdx: null,
+            viewingResultId: null,
+            isDataLoaded: false
+        };
 
-                if (type === 'NOTICE') await pub('announcements').add({ title: v1, content: v2, at: Date.now() });
-                if (type === 'PLAN_ADD') await priv('planner').add({ text: v1, done: false, date: state.dates.tdStr, at: Date.now() });
-                if (type === 'SCHED') await pub('schedules').add({ title: v1, date: v2, at: Date.now() });
-                if (type === 'FILE') await pub('materials').add({ title: v1, subject: v2, link: v3, at: Date.now() });
-                if (type === 'MEMO') await pub('memos').doc(targetId).set({ content: v1, at: Date.now() });
-                if (type === 'MEAL') await pub('meals').doc(targetId).set({ menu: v1, at: Date.now() });
-                if (type === 'TIME') await pub('timetables').doc(targetId).set({ periods: (v1 || '').split(',').map(s=>s.trim()), at: Date.now() });
-            } catch(e) { 
-                console.error(e); 
-                document.getElementById('permission-error').style.display = 'block';
-            }
-            closeModal();
-        }
+        const eCol = collection(db, 'artifacts', APP_ID, 'public', 'data', 'exams');
+        const rCol = collection(db, 'artifacts', APP_ID, 'public', 'data', 'results');
 
-        function closeModal() { document.getElementById('modal-container').classList.add('hidden'); }
+        window.ui = {
+            showToast: (msg) => {
+                const t = document.getElementById('toast');
+                if(!t) return;
+                t.innerText = msg;
+                t.classList.add('toast-active');
+                setTimeout(() => t.classList.remove('toast-active'), 2500);
+            },
+            hideLoading: () => {
+                const l = document.getElementById('loading');
+                if (l) {
+                    l.classList.add('opacity-0');
+                    setTimeout(() => l.classList.add('hidden'), 500);
+                }
+            },
+            openConfirm: (title, desc, onConfirm) => {
+                const m = document.getElementById('confirm-modal');
+                document.getElementById('confirm-title').innerText = title;
+                document.getElementById('confirm-desc').innerText = desc;
+                const btn = document.getElementById('confirm-btn');
+                btn.onclick = () => { onConfirm(); ui.closeConfirm(); };
+                m.classList.replace('hidden', 'flex');
+            },
+            closeConfirm: () => document.getElementById('confirm-modal').classList.replace('flex', 'hidden'),
+            
+            openEditModal: (examId, qIdx) => {
+                const exam = window.state.exams.find(item => item.id === examId);
+                if (!exam) return;
+                const q = exam.questions[qIdx];
+                if (!q) return;
 
-        window.onscroll = function() {
-            const nav = document.getElementById('nav-container');
-            const wrap = document.getElementById('floating-bar');
-            const texts = document.querySelectorAll('.nav-text');
-            const isScrolled = window.scrollY > 40;
+                window.state.editingExamId = examId;
+                window.state.editingQIdx = qIdx;
 
-            if (isScrolled) {
-                wrap.style.width = '240px';
-                nav.style.height = '58px';
-                texts.forEach(t => t.classList.add('hidden-text'));
-            } else {
-                wrap.style.width = 'calc(100% - 40px)';
-                nav.style.height = '76px';
-                texts.forEach(t => t.classList.remove('hidden-text'));
+                document.getElementById('edit-q-text').value = q.question;
+                document.getElementById('edit-q-answer').value = q.answer; // JSON 기준 0~4
+                
+                const container = document.getElementById('edit-options-container');
+                container.innerHTML = '';
+                q.options.forEach((opt, i) => {
+                    const div = document.createElement('div');
+                    div.className = "bg-gray-50 p-3 rounded-xl space-y-2 border border-gray-100";
+                    div.innerHTML = `
+                        <input type="text" value="${opt}" class="opt-val w-full bg-white px-3 py-2 rounded-lg text-xs outline-none border-none focus:ring-1 focus:ring-indigo-200" placeholder="선지 ${i+1}">
+                        <input type="text" value="${q.explanations[i] || ''}" class="exp-val w-full bg-white px-3 py-2 rounded-lg text-[10px] outline-none border-none focus:ring-1 focus:ring-indigo-200" placeholder="해설 ${i+1}">
+                    `;
+                    container.appendChild(div);
+                });
+
+                document.getElementById('edit-modal').classList.replace('hidden', 'flex');
+            },
+            closeEditModal: () => {
+                document.getElementById('edit-modal').classList.replace('flex', 'hidden');
+                window.state.editingExamId = null;
+                window.state.editingQIdx = null;
+            },
+            saveQuestion: async () => {
+                const examId = window.state.editingExamId;
+                const qIdx = window.state.editingQIdx;
+                const exam = window.state.exams.find(e => e.id === examId);
+                
+                const questionText = document.getElementById('edit-q-text').value;
+                const answer = parseInt(document.getElementById('edit-q-answer').value);
+                const options = Array.from(document.querySelectorAll('.opt-val')).map(el => el.value);
+                const explanations = Array.from(document.querySelectorAll('.exp-val')).map(el => el.value);
+
+                // 인덱스 기준 0~4인지 확인
+                if (!questionText || isNaN(answer) || answer < 0 || answer >= options.length) {
+                    return ui.showToast(`정확한 정답 인덱스(0~${options.length - 1})를 입력해주세요.`);
+                }
+
+                const updatedQuestions = [...exam.questions];
+                updatedQuestions[qIdx] = {
+                    ...updatedQuestions[qIdx],
+                    question: questionText,
+                    answer: answer,
+                    options: options,
+                    explanations: explanations
+                };
+
+                try {
+                    await updateDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', 'exams', examId), {
+                        questions: updatedQuestions
+                    });
+                    ui.showToast("문항 수정 완료");
+                    ui.closeEditModal();
+                } catch (e) {
+                    ui.showToast("수정 중 오류 발생");
+                }
+            },
+            login: () => {
+                const id = document.getElementById('student-id-input').value;
+                if (id.length === 5 && /^\d+$/.test(id)) {
+                    window.state.studentId = id;
+                    window.state.isLoggedIn = true;
+                    localStorage.setItem('duru_student_id', id);
+                    ui.showToast(`${id}님 환영합니다!`);
+                    router.navigate('home');
+                } else {
+                    ui.showToast("학번 5자리를 정확히 입력하세요.");
+                }
+            },
+            logout: () => {
+                ui.openConfirm("로그아웃", "로그아웃 하시겠습니까? (응시 기록은 보존됩니다)", () => {
+                    window.state.isLoggedIn = false;
+                    localStorage.removeItem('duru_student_id');
+                    router.navigate('login');
+                });
+            },
+            handleTitleClick: () => {
+                window.state.titleClicks++;
+                if (window.state.titleClicks >= 5) {
+                    document.getElementById('admin-modal').classList.replace('hidden', 'flex');
+                    window.state.titleClicks = 0;
+                }
+                setTimeout(() => window.state.titleClicks = 0, 3000);
+            },
+            closeAdminModal: () => document.getElementById('admin-modal').classList.replace('flex', 'hidden'),
+            verifyAdmin: () => {
+                if (document.getElementById('admin-pw-input').value === 'admin123') {
+                    window.state.isAdmin = true;
+                    ui.closeAdminModal();
+                    ui.showToast("관리자 모드로 접속했습니다.");
+                    router.navigate('admin_manage');
+                } else {
+                    ui.showToast("비밀번호 오류");
+                }
+            },
+            addExam: async () => {
+                const title = document.getElementById('exam-title-input').value.trim();
+                const text = document.getElementById('json-input').value;
+                
+                if(!title) return ui.showToast("시험 제목을 입력해주세요.");
+                if(!text) return ui.showToast("JSON 데이터를 입력해주세요.");
+                
+                try {
+                    const data = JSON.parse(text);
+                    const questions = Array.isArray(data) ? data : [data];
+                    
+                    await addDoc(eCol, { 
+                        title: title,
+                        questions: questions,
+                        createdAt: serverTimestamp() 
+                    });
+                    
+                    document.getElementById('exam-title-input').value = '';
+                    document.getElementById('json-input').value = '';
+                    ui.showToast(`[${title}] 등록 완료!`);
+                } catch (e) {
+                    console.error("Add Exam Error:", e);
+                    ui.showToast("등록 실패: JSON 형식을 확인해주세요.");
+                }
+            },
+            deleteExam: (id) => {
+                ui.openConfirm("시험 삭제", "이 시험을 전체 삭제하시겠습니까?", async () => {
+                    await deleteDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', 'exams', id));
+                    ui.showToast("삭제 완료");
+                });
+            },
+            startQuiz: (examId) => {
+                const exam = window.state.exams.find(e => e.id === examId);
+                if (!exam || exam.questions.length === 0) return ui.showToast("문제가 없습니다.");
+                
+                window.state.currentExamId = examId;
+                window.state.quizIndex = 0;
+                window.state.answers = [];
+                router.navigate('solving');
+            },
+            selectOption: (val) => {
+                // val은 0~4 인덱스 그대로 저장
+                window.state.answers[window.state.quizIndex] = val;
+                ui.render();
+            },
+            nextQuestion: () => {
+                const exam = window.state.exams.find(e => e.id === window.state.currentExamId);
+                if (window.state.quizIndex < exam.questions.length - 1) {
+                    window.state.quizIndex++;
+                    ui.render();
+                } else {
+                    ui.submitExam();
+                }
+            },
+            submitExam: async () => {
+                const exam = window.state.exams.find(e => e.id === window.state.currentExamId);
+                let score = 0;
+                
+                // 제출 당시의 문항 데이터 영구 보존
+                const examSnapshot = exam.questions.map(q => ({
+                    question: q.question,
+                    options: q.options,
+                    answer: q.answer, // 0~4
+                    explanations: q.explanations || []
+                }));
+
+                // 둘 다 0~4 이므로 직접 비교
+                exam.questions.forEach((q, i) => { 
+                    if (q.answer === window.state.answers[i]) score++; 
+                });
+                
+                const finalScore = Math.round((score / exam.questions.length) * 100);
+                
+                try {
+                    const docRef = await addDoc(rCol, {
+                        studentId: window.state.studentId,
+                        examId: exam.id,
+                        examTitle: exam.title,
+                        score: finalScore,
+                        answers: window.state.answers, // 0~4 배열
+                        questionsSnapshot: examSnapshot,
+                        timestamp: serverTimestamp()
+                    });
+                    
+                    window.state.viewingResultId = docRef.id;
+                    ui.showToast("수고하셨습니다. 제출 완료!");
+                    router.navigate('result_detail');
+                } catch(e) {
+                    console.error("Submit Exam Error:", e);
+                    ui.showToast("기록 저장 중 오류가 발생했습니다.");
+                }
+            },
+            viewPastResult: (resultId) => {
+                window.state.viewingResultId = resultId;
+                router.navigate('result_detail');
+            },
+            render: () => {
+                const content = document.getElementById('content');
+                const nav = document.getElementById('navbar');
+                if (!content || !nav) return;
+
+                const isFullScreenView = ['login', 'solving', 'result_detail'].includes(window.state.currentView);
+                nav.classList.toggle('hidden', isFullScreenView || window.state.isAdmin);
+
+                document.querySelectorAll('.nav-btn').forEach(btn => {
+                    const active = btn.dataset.tab === window.state.currentView;
+                    btn.classList.toggle('text-[#002ba3]', active);
+                    btn.classList.toggle('text-gray-400', !active);
+                    btn.classList.toggle('active-tab', active);
+                    btn.querySelector('.icon-box').classList.toggle('bg-[#dbe4ff]', active);
+                });
+
+                if (window.state.currentView === 'login') {
+                    content.innerHTML = `
+                        <div class="flex flex-col items-center justify-center min-h-[80vh] gap-10">
+                            <div class="text-center select-none" onclick="ui.handleTitleClick()">
+                                <div class="w-20 h-20 bg-[#e0e8ff] text-[#0048e3] rounded-[2rem] flex items-center justify-center mx-auto mb-6 shadow-sm">
+                                    <span class="material-symbols-rounded text-4xl">history_edu</span>
+                                </div>
+                                <h1 class="text-3xl font-black tracking-tighter">Duru Tester</h1>
+                                <p class="text-gray-400 text-sm mt-1 uppercase tracking-widest font-bold">Smart Assessment</p>
+                            </div>
+                            <div class="w-full space-y-4">
+                                <input id="student-id-input" type="text" maxlength="5" placeholder="학번 5자리 입력 (예: 10101)" 
+                                    class="w-full bg-white rounded-[2rem] py-5 px-8 text-center text-xl shadow-sm focus:ring-4 focus:ring-[#dbe4ff] outline-none border-none transition-all">
+                                <button onclick="ui.login()" class="w-full bg-[#0048e3] text-white py-5 rounded-[2rem] font-bold text-lg shadow-lg active:scale-95 transition-all">입장하기</button>
+                            </div>
+                        </div>
+                    `;
+                } else if (window.state.currentView === 'home') {
+                    content.innerHTML = `
+                        <div class="space-y-8">
+                            <header>
+                                <p class="text-[#0048e3] font-bold text-sm uppercase tracking-tighter">HELLO,</p>
+                                <h2 class="text-3xl font-black">${window.state.studentId}님</h2>
+                            </header>
+                            
+                            <div class="bg-[#dbe4ff] p-8 rounded-[2.5rem] shadow-sm relative overflow-hidden">
+                                <div class="relative z-10 space-y-4">
+                                    <h3 class="text-xl font-bold text-[#001d6d]">새로운 시험에<br>도전해보세요!</h3>
+                                    <p class="text-[#001d6d]/60 text-xs leading-relaxed">하단 메뉴의 '시험 센터'에서<br>등록된 시험들을 확인할 수 있습니다.</p>
+                                    <button onclick="router.navigate('quiz')" class="bg-[#0048e3] text-white font-bold py-3 px-8 rounded-2xl shadow-md active:scale-95 transition-all mt-2">시험 센터로 이동</button>
+                                </div>
+                                <span class="material-symbols-rounded absolute -right-4 -bottom-8 text-[150px] text-[#0048e3]/10 rotate-12">local_library</span>
+                            </div>
+
+                            <div class="grid grid-cols-2 gap-3">
+                                <div class="bg-white p-6 rounded-[2rem] shadow-sm">
+                                    <span class="material-symbols-rounded text-green-500 mb-2">verified</span>
+                                    <p class="font-bold text-gray-800 text-sm">진행 가능 시험</p>
+                                    <p class="text-2xl font-black text-gray-900 mt-1">${window.state.exams.length}</p>
+                                </div>
+                                <div class="bg-white p-6 rounded-[2rem] shadow-sm" onclick="router.navigate('profile')">
+                                    <span class="material-symbols-rounded text-orange-500 mb-2">analytics</span>
+                                    <p class="font-bold text-gray-800 text-sm">나의 응시 횟수</p>
+                                    <p class="text-2xl font-black text-gray-900 mt-1">${window.state.results.filter(r => r.studentId === window.state.studentId).length}</p>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                } else if (window.state.currentView === 'solving') {
+                    const exam = window.state.exams.find(e => e.id === window.state.currentExamId);
+                    const q = exam.questions[window.state.quizIndex];
+                    if(!q) return router.navigate('home');
+                    
+                    content.innerHTML = `
+                        <div class="space-y-6">
+                            <div class="flex flex-col items-center gap-2 mb-4">
+                                <p class="text-xs font-black text-indigo-400 uppercase tracking-widest">${exam.title}</p>
+                                <div class="flex justify-between w-full items-center">
+                                    <span class="bg-indigo-100 text-indigo-600 px-4 py-1 rounded-full text-[10px] font-black uppercase">Q. ${window.state.quizIndex + 1} / ${exam.questions.length}</span>
+                                    <button onclick="router.navigate('quiz')" class="text-gray-300"><span class="material-symbols-rounded">close</span></button>
+                                </div>
+                            </div>
+                            <div class="bg-white p-8 rounded-[2.5rem] shadow-sm min-h-[140px] flex items-center border border-indigo-50">
+                                <h2 class="text-lg font-bold leading-relaxed tracking-tight break-keep text-[#1c1b1f]">${q.question}</h2>
+                            </div>
+                            <div class="space-y-3">
+                                ${q.options.map((opt, i) => `
+                                    <button onclick="ui.selectOption(${i})" class="w-full p-5 rounded-[1.8rem] text-left transition-all flex items-center gap-4 ${window.state.answers[window.state.quizIndex] === i ? 'bg-[#0048e3] text-white shadow-lg' : 'bg-white text-gray-600 shadow-sm'}">
+                                        <span class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${window.state.answers[window.state.quizIndex] === i ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-400'}">${i + 1}</span>
+                                        <span class="font-bold text-sm leading-snug">${opt}</span>
+                                    </button>
+                                `).join('')}
+                            </div>
+                            <button onclick="ui.nextQuestion()" ${window.state.answers[window.state.quizIndex] === undefined ? 'disabled' : ''} 
+                                class="w-full bg-[#0048e3] text-white py-5 rounded-[2rem] font-bold shadow-lg disabled:opacity-20 transition-all mt-4">
+                                ${window.state.quizIndex === exam.questions.length - 1 ? '제출하고 채점하기' : '다음 문제'}
+                            </button>
+                        </div>
+                    `;
+                } else if (window.state.currentView === 'result_detail') {
+                    const res = window.state.results.find(r => r.id === window.state.viewingResultId);
+                    if (!res) {
+                        content.innerHTML = `<p class="text-center py-20">기록을 불러오는 중이거나 찾을 수 없습니다.</p>`;
+                        return;
+                    }
+                    const qs = res.questionsSnapshot || [];
+                    content.innerHTML = `
+                        <div class="space-y-8">
+                            <div class="flex items-center gap-4">
+                                <button onclick="router.navigate('profile')" class="text-gray-400"><span class="material-symbols-rounded">arrow_back</span></button>
+                                <span class="font-bold text-gray-500 text-sm">오답 노트 및 상세 결과</span>
+                            </div>
+                            <div class="text-center py-4">
+                                <p class="text-indigo-400 font-bold text-xs uppercase tracking-widest mb-2">${res.examTitle || '시험 결과'}</p>
+                                <h2 class="text-6xl font-black text-[#0048e3] my-2">${res.score}점</h2>
+                                <p class="text-gray-400 text-xs font-bold">${res.timestamp?.toDate().toLocaleString() || '최근'}</p>
+                            </div>
+                            <div class="space-y-6">
+                                ${qs.map((q, i) => {
+                                    const userAns = res.answers[i]; // 0~4 인덱스
+                                    const isCorrect = userAns === q.answer;
+                                    return `
+                                    <div class="bg-white p-6 rounded-[2.5rem] shadow-sm space-y-4 border-l-8 ${isCorrect ? 'border-green-400' : 'border-red-400'}">
+                                        <div class="flex gap-2 items-start">
+                                            <span class="text-xs font-black ${isCorrect ? 'text-green-500' : 'text-red-500'}">Q${i+1}</span>
+                                            <p class="font-bold text-sm text-gray-800 leading-snug">${q.question}</p>
+                                        </div>
+                                        <div class="p-5 bg-gray-50 rounded-2xl text-[13px] leading-relaxed text-gray-700">
+                                            <div class="flex items-center gap-2 mb-2">
+                                                <span class="material-symbols-rounded text-lg ${isCorrect ? 'text-green-500' : 'text-red-500'}">${isCorrect ? 'check_circle' : 'cancel'}</span>
+                                                <p class="font-bold">내 선택: ${userAns !== undefined ? q.options[userAns] : '미선택'}</p>
+                                            </div>
+                                            ${!isCorrect ? `<p class="mb-4 text-gray-400">정답: <span class="text-gray-900 font-bold underline underline-offset-4 decoration-indigo-200">${q.options[q.answer]}</span></p>` : ''}
+                                            <hr class="mb-4 border-gray-200/50">
+                                            <div class="flex gap-2">
+                                                <span class="text-xs font-black text-indigo-400 shrink-0 mt-0.5">해설</span>
+                                                <p class="italic text-gray-500 break-keep leading-relaxed">${(q.explanations && q.explanations[userAns]) ? q.explanations[userAns] : '선택한 답에 대한 해설이 없습니다.'}</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    `;
+                                }).join('')}
+                            </div>
+                            <button onclick="router.navigate('profile')" class="w-full bg-gray-900 text-white py-5 rounded-[2rem] font-bold shadow-xl">닫기 (기록실로 이동)</button>
+                        </div>
+                    `;
+                } else if (window.state.currentView === 'profile') {
+                    const myResults = window.state.results
+                        .filter(r => r.studentId === window.state.studentId)
+                        .sort((a,b) => {
+                            if(!a.timestamp) return -1;
+                            if(!b.timestamp) return 1;
+                            return b.timestamp.seconds - a.timestamp.seconds;
+                        });
+                    const myBest = [...myResults].sort((a,b) => b.score - a.score)[0];
+
+                    content.innerHTML = `
+                        <div class="space-y-8 pb-10">
+                            <div class="flex justify-between items-center">
+                                <h2 class="text-2xl font-black">나의 학습 기록</h2>
+                                <button onclick="ui.logout()" class="text-red-400 font-bold text-xs bg-red-50 px-3 py-1.5 rounded-full">로그아웃</button>
+                            </div>
+                            
+                            <div class="grid grid-cols-2 gap-3">
+                                <div class="bg-gradient-to-br from-[#0048e3] to-[#3a75ff] text-white p-6 rounded-[2rem] shadow-lg shadow-blue-200">
+                                    <p class="text-[10px] font-bold text-blue-100 uppercase mb-1">최고 달성 점수</p>
+                                    <p class="text-3xl font-black">${myBest ? myBest.score : '0'}<span class="text-sm ml-1 text-blue-200">점</span></p>
+                                </div>
+                                <div class="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100">
+                                    <p class="text-[10px] font-bold text-gray-400 uppercase mb-1">누적 응시 횟수</p>
+                                    <p class="text-3xl font-black text-gray-800">${myResults.length}<span class="text-sm ml-1 text-gray-300">회</span></p>
+                                </div>
+                            </div>
+
+                            <div class="space-y-4">
+                                <div class="flex items-center justify-between px-2">
+                                    <p class="text-xs font-black text-gray-400 uppercase tracking-widest">Past Exam History</p>
+                                </div>
+                                ${myResults.length === 0 ? `
+                                    <div class="bg-gray-50 rounded-[2.5rem] py-16 text-center border border-dashed border-gray-200">
+                                        <span class="material-symbols-rounded text-gray-300 text-5xl mb-2">history</span>
+                                        <p class="text-gray-400 text-sm font-bold">아직 응시한 기록이 없습니다.</p>
+                                    </div>
+                                ` : myResults.map((r, i) => `
+                                    <button onclick="ui.viewPastResult('${r.id}')" class="w-full bg-white p-5 rounded-[2rem] flex justify-between items-center shadow-sm border border-transparent hover:border-indigo-100 active:scale-[0.98] transition-all text-left">
+                                        <div class="flex items-center gap-4">
+                                            <div class="w-12 h-12 rounded-[1.2rem] bg-indigo-50 flex flex-col items-center justify-center text-indigo-400">
+                                                <span class="text-[9px] font-black uppercase leading-none mb-0.5">SCORE</span>
+                                                <span class="font-black text-indigo-600 leading-none">${r.score}</span>
+                                            </div>
+                                            <div>
+                                                <p class="font-black text-gray-800 leading-tight">${r.examTitle || '이전 모의고사'}</p>
+                                                <p class="text-[10px] text-gray-400 font-bold uppercase mt-1">${r.timestamp?.toDate().toLocaleString() || '방금 전'}</p>
+                                            </div>
+                                        </div>
+                                        <div class="text-right pl-2">
+                                            <span class="material-symbols-rounded text-gray-300">chevron_right</span>
+                                        </div>
+                                    </button>
+                                `).join('')}
+                            </div>
+                        </div>
+                    `;
+                } else if (window.state.currentView === 'admin_manage') {
+                    content.innerHTML = `
+                        <div class="space-y-6">
+                            <div class="flex justify-between items-center">
+                                <h2 class="text-2xl font-black">Admin Console</h2>
+                                <button onclick="window.state.isAdmin=false; router.navigate('home')" class="text-gray-400"><span class="material-symbols-rounded">logout</span></button>
+                            </div>
+                            <div class="flex gap-2 p-1 bg-gray-100 rounded-[2rem]">
+                                <button onclick="router.navigate('admin_manage')" class="flex-1 py-3 bg-white rounded-full font-bold shadow-sm">시험 및 문항</button>
+                                <button onclick="router.navigate('admin_results')" class="flex-1 py-3 text-gray-400 font-bold">전체 성적</button>
+                            </div>
+                            
+                            <!-- 새 시험 등록 블록 -->
+                            <div class="bg-white p-6 rounded-[2.5rem] shadow-sm space-y-4 border border-indigo-50">
+                                <p class="text-[10px] font-bold text-gray-400 px-2 uppercase tracking-widest">새 시험 등록 (JSON, 정답 인덱스 0~4 기준)</p>
+                                <input type="text" id="exam-title-input" placeholder="시험 제목 (예: 제 1회 한국사 모의고사)" class="w-full bg-[#f9f9f9] rounded-3xl p-4 text-sm font-bold outline-none border-none focus:ring-2 focus:ring-[#d0bcff]">
+                                <textarea id="json-input" placeholder='[{"question": "...", "options": [...], "answer": 0, "explanations": [...]}]' 
+                                    class="w-full h-24 bg-[#f9f9f9] rounded-3xl p-4 text-[10px] font-mono outline-none border-none focus:ring-2 focus:ring-[#d0bcff]"></textarea>
+                                <button onclick="ui.addExam()" class="w-full bg-[#6750a4] text-white py-4 rounded-3xl font-bold active:scale-95 transition-all text-sm shadow-lg">시험 데이터 생성</button>
+                            </div>
+
+                            <div class="space-y-4">
+                                <p class="text-[10px] font-bold text-gray-400 px-2 uppercase tracking-widest">등록된 시험 목록 (${window.state.exams.length})</p>
+                                ${window.state.exams.length === 0 ? '<p class="text-center py-10 text-gray-300">등록된 시험이 없습니다.</p>' : ''}
+                                ${window.state.exams.map(exam => `
+                                    <div class="bg-white p-5 rounded-[2rem] shadow-sm">
+                                        <div class="flex justify-between items-center mb-3 pb-3 border-b border-gray-100">
+                                            <div>
+                                                <h3 class="font-black text-gray-800 text-lg">${exam.title}</h3>
+                                                <p class="text-[10px] text-gray-400 font-bold mt-1">총 ${exam.questions.length}문항</p>
+                                            </div>
+                                            <button onclick="ui.deleteExam('${exam.id}')" class="text-red-400 bg-red-50 p-2 rounded-xl"><span class="material-symbols-rounded">delete</span></button>
+                                        </div>
+                                        <div class="space-y-2">
+                                            ${exam.questions.map((q, idx) => `
+                                                <div class="bg-gray-50 p-3 rounded-2xl flex justify-between items-center gap-2">
+                                                    <span class="text-xs font-black text-indigo-300">#${idx+1}</span>
+                                                    <p class="text-xs font-bold text-gray-600 truncate flex-1">${q.question}</p>
+                                                    <button onclick="ui.openEditModal('${exam.id}', ${idx})" class="text-indigo-500 bg-indigo-50 p-1.5 rounded-lg"><span class="material-symbols-rounded text-sm">edit</span></button>
+                                                </div>
+                                            `).join('')}
+                                        </div>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                    `;
+                } else if (window.state.currentView === 'admin_results') {
+                    content.innerHTML = `
+                        <div class="space-y-6">
+                            <div class="flex justify-between items-center">
+                                <h2 class="text-2xl font-black">전체 응시 데이터</h2>
+                                <button onclick="window.state.isAdmin=false; router.navigate('home')" class="text-gray-400"><span class="material-symbols-rounded">logout</span></button>
+                            </div>
+                            <div class="flex gap-2 p-1 bg-gray-100 rounded-[2rem]">
+                                <button onclick="router.navigate('admin_manage')" class="flex-1 py-3 text-gray-400 font-bold">시험 및 문항</button>
+                                <button onclick="router.navigate('admin_results')" class="flex-1 py-3 bg-white rounded-full font-bold shadow-sm">전체 성적</button>
+                            </div>
+                            <div class="space-y-3">
+                                ${window.state.results.length === 0 ? '<p class="text-center py-20 text-gray-300 font-bold">기록이 없습니다.</p>' : ''}
+                                ${window.state.results.sort((a,b) => {
+                                    if(!a.timestamp) return -1;
+                                    if(!b.timestamp) return 1;
+                                    return b.timestamp.seconds - a.timestamp.seconds;
+                                }).map(r => `
+                                    <div class="bg-white p-5 rounded-[1.8rem] flex justify-between items-center shadow-sm">
+                                        <div class="flex gap-4 items-center">
+                                            <div class="w-12 h-12 bg-gray-100 rounded-2xl flex items-center justify-center font-bold text-indigo-600">${r.studentId.substring(0,2)}</div>
+                                            <div>
+                                                <p class="font-black text-gray-800 text-lg">${r.studentId}</p>
+                                                <p class="text-[10px] text-gray-500 font-bold mb-0.5 truncate max-w-[150px]">${r.examTitle || '이전 모의고사'}</p>
+                                                <p class="text-[9px] text-gray-400 font-bold uppercase tracking-widest">${r.timestamp?.toDate().toLocaleString() || 'Syncing...'}</p>
+                                            </div>
+                                        </div>
+                                        <div class="text-right">
+                                            <p class="text-2xl font-black ${r.score >= 80 ? 'text-[#0048e3]' : 'text-gray-800'}">${r.score}<span class="text-[10px]">점</span></p>
+                                        </div>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                    `;
+                } else if (window.state.currentView === 'quiz') {
+                    content.innerHTML = `
+                        <div class="space-y-6">
+                            <h2 class="text-2xl font-black">시험 센터</h2>
+                            
+                            <div class="space-y-4">
+                                ${window.state.exams.length === 0 ? `
+                                    <div class="bg-white p-10 rounded-[2.5rem] shadow-sm text-center">
+                                        <p class="text-gray-400 font-bold">현재 진행 중인 시험이 없습니다.</p>
+                                    </div>
+                                ` : window.state.exams.map(exam => `
+                                    <div class="bg-white p-6 rounded-[2.5rem] shadow-sm border border-gray-50">
+                                        <div class="flex justify-between items-start mb-4">
+                                            <div>
+                                                <span class="inline-block px-3 py-1 bg-indigo-50 text-indigo-600 text-[10px] font-black rounded-full mb-2">ACTIVE</span>
+                                                <h3 class="font-black text-gray-800 text-lg leading-tight">${exam.title}</h3>
+                                            </div>
+                                            <div class="w-10 h-10 bg-gray-50 rounded-full flex items-center justify-center text-gray-400">
+                                                <span class="material-symbols-rounded text-lg">description</span>
+                                            </div>
+                                        </div>
+                                        <div class="flex items-center gap-4 text-xs font-bold text-gray-500 mb-6">
+                                            <span class="flex items-center gap-1"><span class="material-symbols-rounded text-sm">format_list_numbered</span> ${exam.questions.length}문항</span>
+                                            <span class="flex items-center gap-1"><span class="material-symbols-rounded text-sm">schedule</span> 시간 무제한</span>
+                                        </div>
+                                        <button onclick="ui.startQuiz('${exam.id}')" class="w-full bg-[#f4f7fc] hover:bg-[#dbe4ff] hover:text-[#0048e3] text-gray-700 py-4 rounded-2xl font-black transition-colors">
+                                            이 시험 응시하기
+                                        </button>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                    `;
+                }
             }
         };
 
-        init();
+        window.router = {
+            navigate: (view) => {
+                window.state.currentView = view;
+                window.scrollTo(0,0);
+                ui.render();
+            }
+        };
+
+        const init = async () => {
+            const timeout = setTimeout(() => {
+                if(!window.state.isDataLoaded) {
+                    ui.hideLoading();
+                    ui.showToast("오프라인 상태로 진입합니다.");
+                    router.navigate(window.state.isLoggedIn ? 'home' : 'login');
+                }
+            }, 3000);
+
+            try {
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    await signInAnonymously(auth);
+                }
+                
+                onAuthStateChanged(auth, (u) => { 
+                    if (!u) return;
+                    
+                    onSnapshot(eCol, (snap) => {
+                        window.state.exams = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+                        window.state.isDataLoaded = true;
+                        ui.render();
+                        ui.hideLoading();
+                        clearTimeout(timeout);
+                    }, (err) => {
+                        console.error("Exams Fetch Error", err);
+                        ui.hideLoading();
+                        clearTimeout(timeout);
+                    });
+                    
+                    onSnapshot(rCol, (snap) => {
+                        window.state.results = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+                        ui.render();
+                    });
+                });
+                
+                if (!window.state.isLoggedIn) router.navigate('login');
+                else router.navigate('home');
+
+            } catch (e) {
+                console.error("Init error", e);
+                ui.hideLoading();
+                clearTimeout(timeout);
+            }
+        };
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', init);
+        } else {
+            init();
+        }
     </script>
 </body>
 </html>
