@@ -283,6 +283,7 @@
                 const text = document.getElementById('json-input').value;
                 
                 if(!title) return ui.showToast("시험 제목을 입력해주세요.");
+                if(!text) return ui.showToast("JSON 데이터를 입력해주세요.");
                 
                 try {
                     const data = JSON.parse(text);
@@ -298,7 +299,8 @@
                     document.getElementById('json-input').value = '';
                     ui.showToast(`[${title}] 등록 완료!`);
                 } catch (e) {
-                    ui.showToast("JSON 형식 오류. 대괄호 배열 형태인지 확인하세요.");
+                    console.error("Add Exam Error:", e);
+                    ui.showToast("등록 실패: " + (e.message.includes("JSON") ? "JSON 형식 오류입니다." : "권한 문제일 수 있습니다. 콘솔을 확인하세요."));
                 }
             },
             deleteExam: (id) => {
@@ -699,37 +701,41 @@
             const timeout = setTimeout(() => {
                 if(!window.state.isDataLoaded) {
                     ui.hideLoading();
-                    ui.showToast("오프라인 상태로 진입합니다.");
+                    ui.showToast("데이터 로딩 지연. 오프라인 모드입니다.");
                     router.navigate(window.state.isLoggedIn ? 'home' : 'login');
                 }
-            }, 3000);
+            }, 5000);
 
             try {
+                // 1. Auth 통과 대기 (Rule 3 준수)
                 if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
                     await signInWithCustomToken(auth, __initial_auth_token);
                 } else {
                     await signInAnonymously(auth);
                 }
                 
-                onAuthStateChanged(auth, (u) => { 
-                    if (!u) return;
+                const user = auth.currentUser;
+                if (!user) throw new Error("인증에 실패했습니다.");
                     
-                    onSnapshot(eCol, (snap) => {
-                        window.state.exams = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-                        window.state.isDataLoaded = true;
-                        ui.render();
-                        ui.hideLoading();
-                        clearTimeout(timeout);
-                    }, (err) => {
-                        console.error("Exams Fetch Error", err);
-                        ui.hideLoading();
-                        clearTimeout(timeout);
-                    });
-                    
-                    onSnapshot(rCol, (snap) => {
-                        window.state.results = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-                        ui.render();
-                    });
+                // 2. 데이터 리스너 등록
+                onSnapshot(eCol, (snap) => {
+                    window.state.exams = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+                    window.state.isDataLoaded = true;
+                    ui.render();
+                    ui.hideLoading();
+                    clearTimeout(timeout);
+                }, (err) => {
+                    console.error("Exams Fetch Error:", err);
+                    ui.showToast("시험 목록 동기화 오류: " + err.code);
+                    ui.hideLoading();
+                    clearTimeout(timeout);
+                });
+                
+                onSnapshot(rCol, (snap) => {
+                    window.state.results = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+                    ui.render();
+                }, (err) => {
+                    console.error("Results Fetch Error:", err);
                 });
                 
                 if (!window.state.isLoggedIn) router.navigate('login');
@@ -737,6 +743,7 @@
 
             } catch (e) {
                 console.error("Init error", e);
+                ui.showToast("초기화 실패: " + e.message);
                 ui.hideLoading();
                 clearTimeout(timeout);
             }
