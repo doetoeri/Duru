@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Duru Tester</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Noto Sans KR', sans-serif; -webkit-tap-highlight-color: transparent; overflow-x: hidden; }
+        .material-symbols-rounded { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+        .active-tab .material-symbols-rounded { font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+        .glass { background: rgba(255, 255, 255, 0.8); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); }
+        .toast-active { transform: translate(-50%, -24px) !important; opacity: 1 !important; }
+        input[type="radio"]:checked + label { background-color: #0048e3; color: white; border-color: #0048e3; }
+    </style>
+</head>
+<body class="bg-[#f8f9ff] text-[#1a1c1e] min-h-screen">
+
+    <div id="app" class="max-w-md mx-auto min-h-screen relative pb-32">
+        <!-- Loading Screen -->
+        <div id="loading" class="fixed inset-0 bg-white z-[100] flex items-center justify-center transition-opacity duration-500">
+            <div class="flex flex-col items-center gap-4">
+                <div class="w-10 h-10 border-4 border-[#dbe4ff] border-t-[#0048e3] rounded-full animate-spin"></div>
+            </div>
+        </div>
+
+        <!-- In-app Toast -->
+        <div id="toast" class="fixed bottom-0 left-1/2 -translate-x-1/2 mb-24 z-[300] bg-[#313033] text-[#f4f0f4] px-6 py-3 rounded-2xl text-sm shadow-xl opacity-0 transition-all duration-300 pointer-events-none whitespace-nowrap"></div>
+
+        <!-- Global Confirm Modal -->
+        <div id="confirm-modal" class="fixed inset-0 bg-black/40 backdrop-blur-sm z-[250] hidden items-center justify-center p-6">
+            <div class="bg-white w-full max-w-xs rounded-[2.5rem] p-8 shadow-2xl">
+                <h3 id="confirm-title" class="text-xl font-bold mb-2 text-center text-[#1c1b1f]">확인</h3>
+                <p id="confirm-desc" class="text-sm text-gray-500 text-center mb-6">설명이 표시됩니다.</p>
+                <div class="flex gap-2">
+                    <button onclick="ui.closeConfirm()" class="flex-1 py-3 bg-gray-100 rounded-full font-bold text-gray-600">취소</button>
+                    <button id="confirm-btn" class="flex-1 py-3 bg-[#ba1a1a] text-white rounded-full font-bold">확인</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Admin Edit Modal -->
+        <div id="edit-modal" class="fixed inset-0 bg-black/40 backdrop-blur-sm z-[200] hidden items-center justify-center p-6 overflow-y-auto">
+            <div class="bg-white w-full max-w-sm rounded-[2.5rem] p-6 shadow-2xl my-auto">
+                <h2 class="text-xl font-bold mb-4">문제 편집</h2>
+                <div class="space-y-3 max-h-[60vh] overflow-y-auto pr-2">
+                    <div>
+                        <label class="text-[10px] font-bold text-gray-400 block mb-1 uppercase">질문 내용</label>
+                        <textarea id="edit-q-text" class="w-full bg-gray-50 p-3 rounded-xl text-sm border-none outline-none focus:ring-2 focus:ring-indigo-200" rows="3"></textarea>
+                    </div>
+                    <div id="edit-options-container" class="space-y-2">
+                        <label class="text-[10px] font-bold text-gray-400 block mb-1 uppercase">선지 및 해설</label>
+                        <!-- Options generated here -->
+                    </div>
+                    <div>
+                        <label class="text-[10px] font-bold text-gray-400 block mb-1 uppercase">정답 번호 (1-4)</label>
+                        <input type="number" id="edit-q-answer" min="1" max="4" class="w-full bg-gray-50 p-3 rounded-xl text-sm border-none outline-none focus:ring-2 focus:ring-indigo-200">
+                    </div>
+                </div>
+                <div class="flex gap-2 mt-6">
+                    <button onclick="ui.closeEditModal()" class="flex-1 py-3 bg-gray-100 rounded-xl font-bold text-gray-500">닫기</button>
+                    <button id="save-edit-btn" class="flex-1 py-3 bg-[#6750a4] text-white rounded-xl font-bold">저장하기</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Admin Auth Modal -->
+        <div id="admin-modal" class="fixed inset-0 bg-black/40 backdrop-blur-sm z-[200] hidden items-center justify-center p-6">
+            <div class="bg-white w-full max-w-sm rounded-[2.5rem] p-8 shadow-2xl">
+                <h2 class="text-xl font-bold mb-6 text-center text-[#21103e]">관리자 인증</h2>
+                <input type="password" id="admin-pw-input" placeholder="비밀번호" class="w-full bg-[#f3edf7] px-6 py-4 rounded-2xl text-center outline-none border-2 border-transparent focus:border-[#d0bcff] mb-4">
+                <div class="flex gap-3">
+                    <button onclick="ui.closeAdminModal()" class="flex-1 py-4 bg-gray-50 rounded-2xl font-bold text-gray-500">취소</button>
+                    <button onclick="ui.verifyAdmin()" class="flex-1 py-4 bg-[#6750a4] text-white rounded-2xl font-bold">확인</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div id="content" class="p-6 pt-12"></div>
+
+        <!-- Bottom Navigation -->
+        <nav id="navbar" class="fixed bottom-6 left-1/2 -translate-x-1/2 w-[calc(100%-3rem)] max-w-sm z-50 hidden">
+            <div class="glass shadow-[0_8px_32px_rgba(0,0,0,0.06)] rounded-[2.5rem] px-4 py-3 flex justify-between items-center border border-white/50">
+                <button onclick="router.navigate('home')" class="nav-btn flex flex-col items-center gap-1 w-20" data-tab="home">
+                    <div class="icon-box px-5 py-1.5 rounded-full transition-all duration-300"><span class="material-symbols-rounded">home</span></div>
+                    <span class="text-[10px] font-bold">홈</span>
+                </button>
+                <button onclick="router.navigate('quiz')" class="nav-btn flex flex-col items-center gap-1 w-20" data-tab="quiz">
+                    <div class="icon-box px-5 py-1.5 rounded-full transition-all duration-300"><span class="material-symbols-rounded">quiz</span></div>
+                    <span class="text-[10px] font-bold">시험</span>
+                </button>
+                <button onclick="router.navigate('profile')" class="nav-btn flex flex-col items-center gap-1 w-20" data-tab="profile">
+                    <div class="icon-box px-5 py-1.5 rounded-full transition-all duration-300"><span class="material-symbols-rounded">person</span></div>
+                    <span class="text-[10px] font-bold">내 정보</span>
+                </button>
+            </div>
+        </nav>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getFirestore, collection, addDoc, onSnapshot, doc, deleteDoc, updateDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyDC6tQ3FMdYZ7uNUgLxKfOYELt8FEZ83bg",
+            authDomain: "durutester.firebaseapp.com",
+            projectId: "durutester",
+            storageBucket: "durutester.firebasestorage.app",
+            messagingSenderId: "1093780593477",
+            appId: "1:1093780593477:web:b7fdfdc6e099e7aedffc2c"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+        const APP_ID = "durutester";
+
+        window.state = {
+            studentId: localStorage.getItem('duru_student_id') || '',
+            isLoggedIn: !!localStorage.getItem('duru_student_id'),
+            isAdmin: false,
+            questions: [],
+            results: [],
+            currentView: 'login',
+            titleClicks: 0,
+            quizIndex: 0,
+            answers: [],
+            finalScore: 0,
+            editingId: null
+        };
+
+        const qCol = collection(db, 'artifacts', APP_ID, 'public', 'data', 'questions');
+        const rCol = collection(db, 'artifacts', APP_ID, 'public', 'data', 'results');
+
+        window.ui = {
+            showToast: (msg) => {
+                const t = document.getElementById('toast');
+                t.innerText = msg;
+                t.classList.add('toast-active');
+                setTimeout(() => t.classList.remove('toast-active'), 2500);
+            },
+            openConfirm: (title, desc, onConfirm) => {
+                const m = document.getElementById('confirm-modal');
+                document.getElementById('confirm-title').innerText = title;
+                document.getElementById('confirm-desc').innerText = desc;
+                const btn = document.getElementById('confirm-btn');
+                btn.onclick = () => { onConfirm(); ui.closeConfirm(); };
+                m.classList.replace('hidden', 'flex');
+            },
+            closeConfirm: () => document.getElementById('confirm-modal').classList.replace('flex', 'hidden'),
+            
+            openEditModal: (qId) => {
+                const q = window.state.questions.find(item => item.id === qId);
+                if (!q) return;
+                window.state.editingId = qId;
+                document.getElementById('edit-q-text').value = q.question;
+                document.getElementById('edit-q-answer').value = q.answer;
+                
+                const container = document.getElementById('edit-options-container');
+                container.innerHTML = '';
+                q.options.forEach((opt, i) => {
+                    const div = document.createElement('div');
+                    div.className = "bg-gray-50 p-3 rounded-xl space-y-2 border border-gray-100";
+                    div.innerHTML = `
+                        <input type="text" value="${opt}" class="opt-val w-full bg-white px-3 py-2 rounded-lg text-xs outline-none border-none focus:ring-1 focus:ring-indigo-200" placeholder="선지 ${i+1}">
+                        <input type="text" value="${q.explanations[i]}" class="exp-val w-full bg-white px-3 py-2 rounded-lg text-[10px] outline-none border-none focus:ring-1 focus:ring-indigo-200" placeholder="해설 ${i+1}">
+                    `;
+                    container.appendChild(div);
+                });
+
+                document.getElementById('save-edit-btn').onclick = () => ui.saveQuestion();
+                document.getElementById('edit-modal').classList.replace('hidden', 'flex');
+            },
+            closeEditModal: () => {
+                document.getElementById('edit-modal').classList.replace('flex', 'hidden');
+                window.state.editingId = null;
+            },
+            saveQuestion: async () => {
+                const qId = window.state.editingId;
+                const questionText = document.getElementById('edit-q-text').value;
+                const answer = parseInt(document.getElementById('edit-q-answer').value);
+                const options = Array.from(document.querySelectorAll('.opt-val')).map(el => el.value);
+                const explanations = Array.from(document.querySelectorAll('.exp-val')).map(el => el.value);
+
+                if (!questionText || isNaN(answer)) return ui.showToast("내용을 채워주세요.");
+
+                try {
+                    await updateDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', 'questions', qId), {
+                        question: questionText,
+                        answer: answer,
+                        options: options,
+                        explanations: explanations
+                    });
+                    ui.showToast("수정 완료");
+                    ui.closeEditModal();
+                } catch (e) {
+                    ui.showToast("수정 중 오류 발생");
+                }
+            },
+            login: () => {
+                const id = document.getElementById('student-id-input').value;
+                if (id.length === 5 && /^\d+$/.test(id)) {
+                    window.state.studentId = id;
+                    window.state.isLoggedIn = true;
+                    localStorage.setItem('duru_student_id', id);
+                    ui.showToast(`${id}님 환영합니다!`);
+                    router.navigate('home');
+                } else {
+                    ui.showToast("학번 5자리를 입력하세요.");
+                }
+            },
+            logout: () => {
+                ui.openConfirm("로그아웃", "정말 로그아웃 하시겠습니까?", () => {
+                    window.state.isLoggedIn = false;
+                    localStorage.removeItem('duru_student_id');
+                    router.navigate('login');
+                });
+            },
+            handleTitleClick: () => {
+                window.state.titleClicks++;
+                if (window.state.titleClicks >= 5) {
+                    document.getElementById('admin-modal').classList.replace('hidden', 'flex');
+                    window.state.titleClicks = 0;
+                }
+                setTimeout(() => window.state.titleClicks = 0, 3000);
+            },
+            closeAdminModal: () => document.getElementById('admin-modal').classList.replace('flex', 'hidden'),
+            verifyAdmin: () => {
+                if (document.getElementById('admin-pw-input').value === 'admin123') {
+                    window.state.isAdmin = true;
+                    ui.closeAdminModal();
+                    ui.showToast("관리자 모드");
+                    router.navigate('admin_manage');
+                } else {
+                    ui.showToast("비밀번호 오류");
+                }
+            },
+            addBulkQuestions: async () => {
+                const text = document.getElementById('json-input').value;
+                try {
+                    const data = JSON.parse(text);
+                    const items = Array.isArray(data) ? data : [data];
+                    for (const item of items) {
+                        await addDoc(qCol, { ...item, createdAt: serverTimestamp() });
+                    }
+                    document.getElementById('json-input').value = '';
+                    ui.showToast(`${items.length}개 추가 완료`);
+                } catch (e) {
+                    ui.showToast("JSON 형식 오류");
+                }
+            },
+            deleteQuestion: (id) => {
+                ui.openConfirm("삭제", "정말 삭제할까요?", async () => {
+                    await deleteDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', 'questions', id));
+                    ui.showToast("삭제 완료");
+                });
+            },
+            startQuiz: () => {
+                if (window.state.questions.length === 0) return ui.showToast("문제가 없습니다.");
+                window.state.quizIndex = 0;
+                window.state.answers = [];
+                router.navigate('solving');
+            },
+            selectOption: (val) => {
+                window.state.answers[window.state.quizIndex] = val;
+                ui.render();
+            },
+            nextQuestion: () => {
+                if (window.state.quizIndex < window.state.questions.length - 1) {
+                    window.state.quizIndex++;
+                    ui.render();
+                } else {
+                    ui.submitExam();
+                }
+            },
+            submitExam: async () => {
+                let score = 0;
+                window.state.questions.forEach((q, i) => { if (q.answer === window.state.answers[i]) score++; });
+                window.state.finalScore = Math.round((score / window.state.questions.length) * 100);
+                
+                await addDoc(rCol, {
+                    studentId: window.state.studentId,
+                    score: window.state.finalScore,
+                    answers: window.state.answers,
+                    timestamp: serverTimestamp()
+                });
+                
+                ui.showToast("제출 완료");
+                router.navigate('result_detail');
+            },
+            render: () => {
+                const content = document.getElementById('content');
+                const nav = document.getElementById('navbar');
+                if (!content || !nav) return;
+
+                nav.classList.toggle('hidden', window.state.currentView === 'login' || window.state.currentView === 'solving' || window.state.isAdmin);
+
+                document.querySelectorAll('.nav-btn').forEach(btn => {
+                    const active = btn.dataset.tab === window.state.currentView;
+                    btn.classList.toggle('text-[#002ba3]', active);
+                    btn.classList.toggle('text-gray-400', !active);
+                    btn.classList.toggle('active-tab', active);
+                    btn.querySelector('.icon-box').classList.toggle('bg-[#dbe4ff]', active);
+                });
+
+                if (window.state.currentView === 'login') {
+                    content.innerHTML = `
+                        <div class="flex flex-col items-center justify-center min-h-[80vh] gap-10">
+                            <div class="text-center select-none" onclick="ui.handleTitleClick()">
+                                <div class="w-20 h-20 bg-[#e0e8ff] text-[#0048e3] rounded-[2rem] flex items-center justify-center mx-auto mb-6 shadow-sm">
+                                    <span class="material-symbols-rounded text-4xl">history_edu</span>
+                                </div>
+                                <h1 class="text-3xl font-black tracking-tighter">Duru Tester</h1>
+                                <p class="text-gray-400 text-sm mt-1 uppercase tracking-widest font-bold">History Examination</p>
+                            </div>
+                            <div class="w-full space-y-4">
+                                <input id="student-id-input" type="text" maxlength="5" placeholder="학번 5자리 입력" 
+                                    class="w-full bg-white rounded-[2rem] py-5 px-8 text-center text-xl shadow-sm focus:ring-4 focus:ring-[#dbe4ff] outline-none border-none transition-all">
+                                <button onclick="ui.login()" class="w-full bg-[#0048e3] text-white py-5 rounded-[2rem] font-bold text-lg shadow-lg active:scale-95 transition-all">입장하기</button>
+                            </div>
+                        </div>
+                    `;
+                } else if (window.state.currentView === 'home') {
+                    content.innerHTML = `
+                        <div class="space-y-8">
+                            <header>
+                                <p class="text-[#0048e3] font-bold text-sm uppercase tracking-tighter">WELCOME BACK</p>
+                                <h2 class="text-3xl font-black">${window.state.studentId}님</h2>
+                            </header>
+                            <div class="bg-[#dbe4ff] p-8 rounded-[2.5rem] shadow-sm relative overflow-hidden">
+                                <div class="relative z-10 space-y-4">
+                                    <h3 class="text-xl font-bold text-[#001d6d]">한국사 모의고사</h3>
+                                    <p class="text-[#001d6d]/60 text-xs leading-relaxed">준비된 문항: ${window.state.questions.length}개<br>시험 시간 제한은 없으나 집중하여 풀어보세요.</p>
+                                    <button onclick="ui.startQuiz()" class="bg-[#0048e3] text-white font-bold py-3 px-8 rounded-2xl shadow-md active:scale-95 transition-all">지금 시작</button>
+                                </div>
+                                <span class="material-symbols-rounded absolute -right-6 -bottom-6 text-[140px] text-[#0048e3]/10 rotate-12">history_edu</span>
+                            </div>
+                        </div>
+                    `;
+                } else if (window.state.currentView === 'solving') {
+                    const q = window.state.questions[window.state.quizIndex];
+                    content.innerHTML = `
+                        <div class="space-y-6">
+                            <div class="flex justify-between items-center">
+                                <span class="bg-indigo-100 text-indigo-600 px-4 py-1 rounded-full text-[10px] font-black uppercase">${window.state.quizIndex + 1} / ${window.state.questions.length}</span>
+                                <button onclick="router.navigate('home')" class="text-gray-300"><span class="material-symbols-rounded">close</span></button>
+                            </div>
+                            <div class="bg-white p-8 rounded-[2.5rem] shadow-sm min-h-[140px] flex items-center">
+                                <h2 class="text-lg font-bold leading-relaxed tracking-tight break-keep text-[#1c1b1f]">${q.question}</h2>
+                            </div>
+                            <div class="space-y-3">
+                                ${q.options.map((opt, i) => `
+                                    <button onclick="ui.selectOption(${i+1})" class="w-full p-5 rounded-[1.8rem] text-left transition-all flex items-center gap-4 ${window.state.answers[window.state.quizIndex] === i + 1 ? 'bg-[#0048e3] text-white shadow-lg' : 'bg-white text-gray-600 shadow-sm'}">
+                                        <span class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${window.state.answers[window.state.quizIndex] === i + 1 ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-400'}">${i + 1}</span>
+                                        <span class="font-bold text-sm">${opt}</span>
+                                    </button>
+                                `).join('')}
+                            </div>
+                            <button onclick="ui.nextQuestion()" ${!window.state.answers[window.state.quizIndex] ? 'disabled' : ''} 
+                                class="w-full bg-[#0048e3] text-white py-5 rounded-[2rem] font-bold shadow-lg disabled:opacity-20 transition-all mt-4">
+                                ${window.state.quizIndex === window.state.questions.length - 1 ? '제출하고 채점하기' : '다음 문제'}
+                            </button>
+                        </div>
+                    `;
+                } else if (window.state.currentView === 'result_detail') {
+                    content.innerHTML = `
+                        <div class="space-y-8">
+                            <div class="text-center py-6">
+                                <p class="text-gray-400 font-bold text-xs uppercase tracking-widest">Examination Result</p>
+                                <h2 class="text-6xl font-black text-[#0048e3] my-2">${window.state.finalScore}점</h2>
+                                <p class="text-gray-800 font-bold">오답 노트를 확인해보세요.</p>
+                            </div>
+                            <div class="space-y-6">
+                                ${window.state.questions.map((q, i) => {
+                                    const isCorrect = window.state.answers[i] === q.answer;
+                                    return `
+                                    <div class="bg-white p-6 rounded-[2.5rem] shadow-sm space-y-4 border-l-8 ${isCorrect ? 'border-green-400' : 'border-red-400'}">
+                                        <div class="flex gap-2 items-start">
+                                            <span class="text-xs font-black ${isCorrect ? 'text-green-500' : 'text-red-500'}">Q${i+1}</span>
+                                            <p class="font-bold text-sm text-gray-800 leading-snug">${q.question}</p>
+                                        </div>
+                                        <div class="p-5 bg-gray-50 rounded-2xl text-[13px] leading-relaxed text-gray-700">
+                                            <div class="flex items-center gap-2 mb-2">
+                                                <span class="material-symbols-rounded text-lg ${isCorrect ? 'text-green-500' : 'text-red-500'}">${isCorrect ? 'check_circle' : 'cancel'}</span>
+                                                <p class="font-bold">내 선택: ${q.options[window.state.answers[i]-1]}</p>
+                                            </div>
+                                            ${!isCorrect ? `<p class="mb-4 text-gray-400">정답: <span class="text-gray-900 font-bold underline underline-offset-4 decoration-indigo-200">${q.options[q.answer-1]}</span></p>` : ''}
+                                            <hr class="mb-4 border-gray-200/50">
+                                            <div class="flex gap-2">
+                                                <span class="text-xs font-black text-indigo-400 shrink-0">해설</span>
+                                                <p class="italic text-gray-500 break-keep leading-relaxed">${q.explanations[window.state.answers[i]-1]}</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    `;
+                                }).join('')}
+                            </div>
+                            <button onclick="router.navigate('home')" class="w-full bg-gray-900 text-white py-5 rounded-[2rem] font-bold shadow-xl">완료</button>
+                        </div>
+                    `;
+                } else if (window.state.currentView === 'admin_manage') {
+                    content.innerHTML = `
+                        <div class="space-y-6">
+                            <div class="flex justify-between items-center">
+                                <h2 class="text-2xl font-black">Admin Console</h2>
+                                <button onclick="window.state.isAdmin=false; router.navigate('home')" class="text-gray-400"><span class="material-symbols-rounded">logout</span></button>
+                            </div>
+                            <div class="flex gap-2 p-1 bg-gray-100 rounded-[2rem]">
+                                <button onclick="router.navigate('admin_manage')" class="flex-1 py-3 bg-white rounded-full font-bold shadow-sm">문제 편집</button>
+                                <button onclick="router.navigate('admin_results')" class="flex-1 py-3 text-gray-400 font-bold">학생 성적</button>
+                            </div>
+                            <div class="bg-white p-6 rounded-[2.5rem] shadow-sm space-y-4">
+                                <p class="text-[10px] font-bold text-gray-400 px-2 uppercase tracking-widest">대량 문항 등록 (JSON)</p>
+                                <textarea id="json-input" placeholder='[{"question": "...", "options": [...], "answer": 1, "explanations": [...]}]' 
+                                    class="w-full h-24 bg-[#f9f9f9] rounded-3xl p-4 text-[10px] font-mono outline-none border-none focus:ring-2 focus:ring-[#d0bcff]"></textarea>
+                                <button onclick="ui.addBulkQuestions()" class="w-full bg-[#6750a4] text-white py-4 rounded-3xl font-bold active:scale-95 transition-all text-sm shadow-lg">데이터 저장</button>
+                            </div>
+                            <div class="space-y-3">
+                                <p class="text-[10px] font-bold text-gray-400 px-2 uppercase tracking-widest">총 문항: ${window.state.questions.length}</p>
+                                ${window.state.questions.map(q => `
+                                    <div class="bg-white p-5 rounded-[1.8rem] flex justify-between items-center shadow-sm hover:shadow-md transition-shadow">
+                                        <div class="w-2/3">
+                                            <p class="text-xs font-black text-indigo-400 mb-1">정답: ${q.answer}번</p>
+                                            <p class="text-sm font-bold truncate pr-4 text-gray-700">${q.question}</p>
+                                        </div>
+                                        <div class="flex gap-1">
+                                            <button onclick="ui.openEditModal('${q.id}')" class="text-indigo-400 p-2"><span class="material-symbols-rounded text-xl">edit_note</span></button>
+                                            <button onclick="ui.deleteQuestion('${q.id}')" class="text-red-400 p-2"><span class="material-symbols-rounded text-xl">delete</span></button>
+                                        </div>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                    `;
+                } else if (window.state.currentView === 'admin_results') {
+                    content.innerHTML = `
+                        <div class="space-y-6">
+                            <div class="flex justify-between items-center">
+                                <h2 class="text-2xl font-black">학생 결과 집계</h2>
+                                <button onclick="window.state.isAdmin=false; router.navigate('home')" class="text-gray-400"><span class="material-symbols-rounded">logout</span></button>
+                            </div>
+                            <div class="flex gap-2 p-1 bg-gray-100 rounded-[2rem]">
+                                <button onclick="router.navigate('admin_manage')" class="flex-1 py-3 text-gray-400 font-bold">문제 편집</button>
+                                <button onclick="router.navigate('admin_results')" class="flex-1 py-3 bg-white rounded-full font-bold shadow-sm">학생 성적</button>
+                            </div>
+                            <div class="space-y-3">
+                                ${window.state.results.length === 0 ? '<p class="text-center py-20 text-gray-300">데이터가 없습니다.</p>' : ''}
+                                ${window.state.results.sort((a,b) => b.timestamp - a.timestamp).map(r => `
+                                    <div class="bg-white p-5 rounded-[1.8rem] flex justify-between items-center shadow-sm">
+                                        <div class="flex gap-4 items-center">
+                                            <div class="w-12 h-12 bg-gray-100 rounded-2xl flex items-center justify-center font-bold text-indigo-600">${r.studentId.substring(0,2)}</div>
+                                            <div>
+                                                <p class="font-black text-gray-800">${r.studentId}</p>
+                                                <p class="text-[9px] text-gray-400 font-bold uppercase">${r.timestamp?.toDate().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) || 'Syncing...'}</p>
+                                            </div>
+                                        </div>
+                                        <div class="text-right">
+                                            <p class="text-2xl font-black ${r.score >= 80 ? 'text-[#0048e3]' : r.score >= 50 ? 'text-orange-500' : 'text-red-500'}">${r.score}<span class="text-[10px]">점</span></p>
+                                        </div>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                    `;
+                } else if (window.state.currentView === 'profile') {
+                    const myBest = window.state.results.filter(r => r.studentId === window.state.studentId).sort((a,b) => b.score - a.score)[0];
+                    content.innerHTML = `
+                        <div class="space-y-8">
+                            <h2 class="text-2xl font-black">내 정보</h2>
+                            <div class="bg-white p-8 rounded-[2.5rem] flex flex-col items-center gap-6 shadow-sm border border-indigo-50">
+                                <div class="w-24 h-24 bg-gradient-to-br from-[#dbe4ff] to-indigo-100 rounded-[2rem] flex items-center justify-center text-[#0048e3] text-4xl font-black shadow-inner">
+                                    ${window.state.studentId.substring(0,2)}
+                                </div>
+                                <div class="text-center">
+                                    <p class="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-1">Authenticated ID</p>
+                                    <p class="text-3xl font-black text-gray-900 tracking-tighter">${window.state.studentId}</p>
+                                </div>
+                                <div class="w-full grid grid-cols-2 gap-2">
+                                    <div class="bg-gray-50 p-4 rounded-3xl text-center">
+                                        <p class="text-[9px] text-gray-400 font-bold uppercase">최고 점수</p>
+                                        <p class="text-xl font-black text-gray-800">${myBest ? myBest.score : '0'}점</p>
+                                    </div>
+                                    <div class="bg-gray-50 p-4 rounded-3xl text-center">
+                                        <p class="text-[9px] text-gray-400 font-bold uppercase">응시 횟수</p>
+                                        <p class="text-xl font-black text-gray-800">${window.state.results.filter(r => r.studentId === window.state.studentId).length}회</p>
+                                    </div>
+                                </div>
+                                <button onclick="ui.logout()" class="w-full bg-red-50 text-red-500 py-4 rounded-3xl font-bold text-sm hover:bg-red-100 transition-colors">로그아웃</button>
+                            </div>
+                        </div>
+                    `;
+                } else if (window.state.currentView === 'quiz') {
+                    content.innerHTML = `
+                        <div class="space-y-6">
+                            <h2 class="text-2xl font-black">시험 센터</h2>
+                            <div class="bg-white p-8 rounded-[2.5rem] shadow-sm space-y-6">
+                                <div class="flex items-center gap-4">
+                                    <div class="w-14 h-14 bg-indigo-50 rounded-2xl flex items-center justify-center text-indigo-600 shadow-inner">
+                                        <span class="material-symbols-rounded text-3xl">task_alt</span>
+                                    </div>
+                                    <div>
+                                        <p class="font-black text-gray-800 leading-tight">한국사 정기 모의고사</p>
+                                        <p class="text-[10px] text-gray-400 font-bold uppercase tracking-tighter mt-1">Status: Open • ${window.state.questions.length} Items</p>
+                                    </div>
+                                </div>
+                                <div class="bg-gray-50 p-5 rounded-3xl space-y-3">
+                                    <p class="text-[11px] font-black text-indigo-400 uppercase">시험 유의사항</p>
+                                    <ul class="text-[12px] text-gray-500 space-y-2 font-medium">
+                                        <li class="flex gap-2"><span class="text-indigo-300">•</span> 모든 문제는 4지 선다형입니다.</li>
+                                        <li class="flex gap-2"><span class="text-indigo-300">•</span> 제출 시 즉시 오답 노트를 확인할 수 있습니다.</li>
+                                        <li class="flex gap-2"><span class="text-indigo-300">•</span> 시험 이력은 관리자에게 전송됩니다.</li>
+                                    </ul>
+                                </div>
+                                <button onclick="ui.startQuiz()" class="w-full bg-[#0048e3] text-white py-5 rounded-[2rem] font-bold shadow-xl active:scale-95 transition-all">응시 시작하기</button>
+                            </div>
+                        </div>
+                    `;
+                }
+            }
+        };
+
+        window.router = {
+            navigate: (view) => {
+                window.state.currentView = view;
+                window.scrollTo(0,0);
+                ui.render();
+            }
+        };
+
+        const init = async () => {
+            try {
+                await signInAnonymously(auth);
+                onAuthStateChanged(auth, (u) => { 
+                    if (!u) return;
+                    onSnapshot(qCol, (snap) => {
+                        window.state.questions = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+                        ui.render();
+                    }, (err) => ui.showToast("문항 로드 실패"));
+                    
+                    onSnapshot(rCol, (snap) => {
+                        window.state.results = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+                        ui.render();
+                    }, (err) => ui.showToast("결과 로드 실패"));
+
+                    const l = document.getElementById('loading');
+                    if(l) {
+                        l.classList.add('opacity-0');
+                        setTimeout(() => l.classList.add('hidden'), 500);
+                    }
+                });
+                if (!window.state.isLoggedIn) router.navigate('login');
+                else router.navigate('home');
+            } catch (e) {
+                ui.showToast("인증 실패. 다시 시도해주세요.");
+            }
+        };
+
+        window.onload = init;
+    </script>
+</body>
+</html>
