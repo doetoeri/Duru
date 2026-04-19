@@ -105,7 +105,6 @@
         import { getFirestore, collection, addDoc, onSnapshot, doc, deleteDoc, updateDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 
-        // 사용자 제공 Firebase 설정
         const defaultConfig = {
             apiKey: "AIzaSyDC6tQ3FMdYZ7uNUgLxKfOYELt8FEZ83bg",
             authDomain: "durutester.firebaseapp.com",
@@ -138,12 +137,10 @@
             currentView: 'login',
             titleClicks: 0,
             
-            // 문제 풀이용 상태
             currentExamId: null,
             quizIndex: 0,
-            answers: [], // 0~4 인덱스가 저장됨
+            answers: [],
             
-            // 편집/조회용 상태
             editingExamId: null,
             editingQIdx: null,
             viewingResultId: null,
@@ -188,16 +185,20 @@
                 window.state.editingQIdx = qIdx;
 
                 document.getElementById('edit-q-text').value = q.question;
-                document.getElementById('edit-q-answer').value = q.answer; // JSON 기준 0~4
+                document.getElementById('edit-q-answer').value = q.answer; 
                 
                 const container = document.getElementById('edit-options-container');
                 container.innerHTML = '';
+                
+                // 단일 문자열 해설일 경우를 대비한 배열 변환 처리
+                const explanationsArray = Array.isArray(q.explanations) ? q.explanations : Array(q.options.length).fill(q.explanations || '');
+                
                 q.options.forEach((opt, i) => {
                     const div = document.createElement('div');
                     div.className = "bg-gray-50 p-3 rounded-xl space-y-2 border border-gray-100";
                     div.innerHTML = `
                         <input type="text" value="${opt}" class="opt-val w-full bg-white px-3 py-2 rounded-lg text-xs outline-none border-none focus:ring-1 focus:ring-indigo-200" placeholder="선지 ${i+1}">
-                        <input type="text" value="${q.explanations[i] || ''}" class="exp-val w-full bg-white px-3 py-2 rounded-lg text-[10px] outline-none border-none focus:ring-1 focus:ring-indigo-200" placeholder="해설 ${i+1}">
+                        <input type="text" value="${explanationsArray[i] || ''}" class="exp-val w-full bg-white px-3 py-2 rounded-lg text-[10px] outline-none border-none focus:ring-1 focus:ring-indigo-200" placeholder="해설 ${i+1}">
                     `;
                     container.appendChild(div);
                 });
@@ -219,7 +220,6 @@
                 const options = Array.from(document.querySelectorAll('.opt-val')).map(el => el.value);
                 const explanations = Array.from(document.querySelectorAll('.exp-val')).map(el => el.value);
 
-                // 인덱스 기준 0~4인지 확인
                 if (!questionText || isNaN(answer) || answer < 0 || answer >= options.length) {
                     return ui.showToast(`정확한 정답 인덱스(0~${options.length - 1})를 입력해주세요.`);
                 }
@@ -322,7 +322,6 @@
                 router.navigate('solving');
             },
             selectOption: (val) => {
-                // val은 0~4 인덱스 그대로 저장
                 window.state.answers[window.state.quizIndex] = val;
                 ui.render();
             },
@@ -339,17 +338,18 @@
                 const exam = window.state.exams.find(e => e.id === window.state.currentExamId);
                 let score = 0;
                 
-                // 제출 당시의 문항 데이터 영구 보존
                 const examSnapshot = exam.questions.map(q => ({
                     question: q.question,
                     options: q.options,
-                    answer: q.answer, // 0~4
+                    answer: q.answer, 
                     explanations: q.explanations || []
                 }));
 
-                // 둘 다 0~4 이므로 직접 비교
+                // Number() 처리를 통해 타입 불일치 에러 완벽 차단
                 exam.questions.forEach((q, i) => { 
-                    if (q.answer === window.state.answers[i]) score++; 
+                    if (window.state.answers[i] !== undefined && Number(q.answer) === Number(window.state.answers[i])) {
+                        score++; 
+                    }
                 });
                 
                 const finalScore = Math.round((score / exam.questions.length) * 100);
@@ -360,7 +360,7 @@
                         examId: exam.id,
                         examTitle: exam.title,
                         score: finalScore,
-                        answers: window.state.answers, // 0~4 배열
+                        answers: window.state.answers,
                         questionsSnapshot: examSnapshot,
                         timestamp: serverTimestamp()
                     });
@@ -483,7 +483,7 @@
                         <div class="space-y-8">
                             <div class="flex items-center gap-4">
                                 <button onclick="router.navigate('profile')" class="text-gray-400"><span class="material-symbols-rounded">arrow_back</span></button>
-                                <span class="font-bold text-gray-500 text-sm">오답 노트 및 상세 결과</span>
+                                <span class="font-bold text-gray-500 text-sm">오답 노트 및 전체 해설</span>
                             </div>
                             <div class="text-center py-4">
                                 <p class="text-indigo-400 font-bold text-xs uppercase tracking-widest mb-2">${res.examTitle || '시험 결과'}</p>
@@ -492,8 +492,10 @@
                             </div>
                             <div class="space-y-6">
                                 ${qs.map((q, i) => {
-                                    const userAns = res.answers[i]; // 0~4 인덱스
-                                    const isCorrect = userAns === q.answer;
+                                    const userAns = res.answers[i];
+                                    const correctAns = Number(q.answer);
+                                    const isCorrect = userAns !== undefined && Number(userAns) === correctAns;
+                                    
                                     return `
                                     <div class="bg-white p-6 rounded-[2.5rem] shadow-sm space-y-4 border-l-8 ${isCorrect ? 'border-green-400' : 'border-red-400'}">
                                         <div class="flex gap-2 items-start">
@@ -503,14 +505,27 @@
                                         <div class="p-5 bg-gray-50 rounded-2xl text-[13px] leading-relaxed text-gray-700">
                                             <div class="flex items-center gap-2 mb-2">
                                                 <span class="material-symbols-rounded text-lg ${isCorrect ? 'text-green-500' : 'text-red-500'}">${isCorrect ? 'check_circle' : 'cancel'}</span>
-                                                <p class="font-bold">내 선택: ${userAns !== undefined ? q.options[userAns] : '미선택'}</p>
+                                                <p class="font-bold">내 선택: ${userAns !== undefined && q.options[userAns] ? q.options[userAns] : '미선택'}</p>
                                             </div>
-                                            ${!isCorrect ? `<p class="mb-4 text-gray-400">정답: <span class="text-gray-900 font-bold underline underline-offset-4 decoration-indigo-200">${q.options[q.answer]}</span></p>` : ''}
+                                            ${!isCorrect ? `<p class="mb-4 text-gray-400">정답: <span class="text-gray-900 font-bold underline underline-offset-4 decoration-indigo-200">${q.options[correctAns] || '데이터 없음'}</span></p>` : ''}
+                                            
                                             <hr class="mb-4 border-gray-200/50">
-                                            <div class="flex gap-2">
-                                                <span class="text-xs font-black text-indigo-400 shrink-0 mt-0.5">해설</span>
-                                                <p class="italic text-gray-500 break-keep leading-relaxed">${(q.explanations && q.explanations[userAns]) ? q.explanations[userAns] : '선택한 답에 대한 해설이 없습니다.'}</p>
+                                            
+                                            <!-- 개선된 전체 해설 표시 영역 -->
+                                            <div class="flex gap-2 flex-col mt-2">
+                                                <span class="text-xs font-black text-indigo-500 shrink-0">📝 전체 해설 (답지)</span>
+                                                <div class="text-[11px] text-gray-600 break-keep leading-relaxed space-y-1.5 bg-white p-4 rounded-xl border border-gray-100">
+                                                    ${Array.isArray(q.explanations)
+                                                        ? q.explanations.map((exp, idx) => `
+                                                            <p class="${idx === correctAns ? 'text-indigo-700 font-bold bg-indigo-50/50 p-1.5 rounded-lg' : 'text-gray-500 p-1'}">
+                                                                [선지 ${idx + 1}] ${exp}
+                                                            </p>
+                                                        `).join('')
+                                                        : `<p>${q.explanations || '등록된 해설이 없습니다.'}</p>`
+                                                    }
+                                                </div>
                                             </div>
+
                                         </div>
                                     </div>
                                     `;
@@ -613,7 +628,10 @@
                                             ${exam.questions.map((q, idx) => `
                                                 <div class="bg-gray-50 p-3 rounded-2xl flex justify-between items-center gap-2">
                                                     <span class="text-xs font-black text-indigo-300">#${idx+1}</span>
-                                                    <p class="text-xs font-bold text-gray-600 truncate flex-1">${q.question}</p>
+                                                    <div class="flex-1 truncate">
+                                                        <span class="text-[10px] font-black text-indigo-500 mr-1 bg-indigo-100 px-1 rounded">정답: ${Number(q.answer) + 1}번</span>
+                                                        <span class="text-xs font-bold text-gray-600">${q.question}</span>
+                                                    </div>
                                                     <button onclick="ui.openEditModal('${exam.id}', ${idx})" class="text-indigo-500 bg-indigo-50 p-1.5 rounded-lg"><span class="material-symbols-rounded text-sm">edit</span></button>
                                                 </div>
                                             `).join('')}
