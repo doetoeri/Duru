@@ -38,9 +38,15 @@
         <!-- Header -->
         <header class="sticky top-0 z-40 bg-[#F2F2F7]/90 backdrop-blur-xl px-6 pt-12 pb-4 flex items-center justify-between">
             <h1 class="text-[30px] font-[900] tracking-tight">Duru</h1>
-            <div id="status-badge" class="live-badge">
-                <div class="pulse-dot" id="main-dot"></div>
-                <span class="text-[11px] font-[900] text-[#007AFF]" id="status-text">CONNECTING</span>
+            <div class="flex items-center gap-2">
+                <!-- Tester Button Added Here -->
+                <a href="/tester" class="btn-press flex items-center justify-center bg-white px-[12px] py-[6px] rounded-[100px] shadow-[0_2px_8px_rgba(0,0,0,0.05)]">
+                    <span class="text-[11px] font-[900] text-[#5C5C5C]">TESTER</span>
+                </a>
+                <div id="status-badge" class="live-badge">
+                    <div class="pulse-dot" id="main-dot"></div>
+                    <span class="text-[11px] font-[900] text-[#007AFF]" id="status-text">CONNECTING</span>
+                </div>
             </div>
         </header>
 
