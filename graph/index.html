@@ -1,4 +1,4 @@
-```html
+
 <!DOCTYPE html>
 <html lang="ko">
 <head>
@@ -18,6 +18,7 @@
             margin: 0;
             padding: 0;
             -webkit-font-smoothing: antialiased;
+            cursor: pointer;
         }
 
         .one-ui-card {
@@ -28,44 +29,59 @@
             overflow: hidden;
         }
 
+        /* 플로팅 바 디자인 복구 및 호환성 강화 */
         .floating-bar {
             position: fixed;
             bottom: 20px;
-            left: 50%;
-            width: 95%;
+            left: 5%;
+            right: 5%;
             max-width: 500px;
-            transform: translateX(-50%);
-            background: rgba(255, 255, 255, 0.95);
-            padding: 10px;
+            margin: 0 auto;
+            background: #ffffff;
             border-radius: 40px;
-            display: flex;
-            justify-content: space-around;
-            box-shadow: 0 8px 24px rgba(0,0,0,0.15);
-            z-index: 1000;
-            border: 1px solid rgba(0,0,0,0.05);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+            z-index: 9999;
+            border: 1px solid #eee;
+            overflow: hidden; /* 내부 버튼들이 튀어나가지 않게 함 */
         }
 
+        .nav-container {
+            width: 100%;
+            padding: 5px 0;
+        }
+
+        /* 구형 기기에서 가장 안정적인 가로 배치 방식 */
         .nav-item {
-            flex: 1;
-            height: 44px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            border-radius: 22px;
-            color: #7d7d7d;
+            float: left;
+            width: 25%;
+            height: 55px;
+            color: #888;
             border: none;
             background: none;
+            text-align: center;
+            font-size: 11px;
+            padding: 0;
+            margin: 0;
             cursor: pointer;
-            font-size: 10px;
-            gap: 2px;
+            -webkit-tap-highlight-color: transparent;
         }
 
-        .nav-item i { font-size: 18px; }
+        .nav-item i { 
+            font-size: 20px; 
+            display: block;
+            margin: 6px auto 2px;
+        }
 
         .nav-item.active {
-            background-color: #007aff;
-            color: white;
+            color: #007aff;
+            font-weight: bold;
+        }
+
+        /* Clearfix for float */
+        .nav-container:after {
+            content: "";
+            display: table;
+            clear: both;
         }
 
         .choice-btn {
@@ -78,6 +94,7 @@
             text-align: center;
             font-weight: 500;
             cursor: pointer;
+            -webkit-appearance: none;
         }
 
         .choice-btn.correct { background-color: #e1f5fe; border-color: #007aff; color: #007aff; }
@@ -85,23 +102,18 @@
 
         .hidden-section { display: none !important; }
 
-        /* 그래프 비율 조정: 가로를 좁게 세로를 길게 */
         .chart-wrapper {
             position: relative;
-            height: 400px; /* 세로 높이 상향 */
-            width: 280px;  /* 가로 너비 제한 */
+            height: 420px;
+            width: 100%;
+            max-width: 300px;
             margin: 0 auto;
         }
 
-        .compare-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 10px;
-        }
-
         .compare-chart-box {
-            height: 250px;
+            height: 300px;
             width: 100%;
+            margin-bottom: 15px;
         }
 
         select {
@@ -109,30 +121,33 @@
             padding: 12px;
             border-radius: 12px;
             border: 1px solid #ddd;
+            background: white;
             margin-bottom: 10px;
             font-size: 14px;
+            -webkit-appearance: none;
         }
 
         @media (min-width: 768px) {
-            .app-container { max-width: 800px; margin: 40px auto; }
+            .app-container { max-width: 700px; margin: 40px auto; }
+            .compare-grid { display: flex; gap: 20px; }
+            .compare-chart-box { flex: 1; }
         }
     </style>
 </head>
 <body class="pb-32">
 
-    <header class="max-w-md mx-auto mt-8 mb-4 px-6 md:max-w-2xl">
-        <h1 id="page-title" class="text-2xl font-bold">기후 마스터</h1>
-        <p id="sub-title" class="text-gray-500 text-sm">그래프 분석 및 비교 학습</p>
+    <header class="max-w-md mx-auto mt-8 mb-4 px-6 md:max-w-2xl text-center md:text-left">
+        <h1 class="text-2xl font-bold">기후 마스터</h1>
+        <p class="text-gray-500 text-sm">그래프 분석 및 비교 학습</p>
     </header>
 
     <main class="app-container px-4">
-        
         <!-- 1. Quiz Section -->
         <section id="section-quiz" class="section">
-            <div class="one-ui-card p-5">
-                <div class="flex justify-between items-center mb-4">
+            <div class="one-ui-card p-4">
+                <div class="flex justify-between items-center mb-2">
                     <span id="counter-text" class="text-blue-600 font-bold text-sm">1 / 14</span>
-                    <span class="bg-blue-50 text-blue-600 px-2 py-1 rounded text-[10px] font-bold">QUIZ</span>
+                    <span class="text-[10px] bg-blue-50 text-blue-500 px-2 py-1 rounded-lg">QUIZ MODE</span>
                 </div>
                 <div class="chart-wrapper">
                     <canvas id="quizChart"></canvas>
@@ -147,7 +162,7 @@
         <section id="section-compare" class="section hidden-section">
             <div class="one-ui-card p-5">
                 <h3 class="font-bold mb-4 text-center">기후 비교 분석</h3>
-                <div class="flex gap-2">
+                <div class="flex flex-col gap-2">
                     <select id="select-1" onchange="updateComparison()"></select>
                     <select id="select-2" onchange="updateComparison()"></select>
                 </div>
@@ -155,65 +170,80 @@
                     <div class="compare-chart-box"><canvas id="compareChart1"></canvas></div>
                     <div class="compare-chart-box"><canvas id="compareChart2"></canvas></div>
                 </div>
-                <div id="comparison-points" class="mt-4 p-4 bg-blue-50 rounded-xl text-sm leading-relaxed">
-                    두 기후를 선택하여 차이점을 확인하세요.
-                </div>
+                <div id="comparison-points" class="mt-2 p-4 bg-blue-50 rounded-xl text-sm leading-relaxed border border-blue-100"></div>
             </div>
         </section>
 
-        <!-- 3. Study Dictionary -->
+        <!-- 3. Dictionary Section -->
         <section id="section-dict" class="section hidden-section">
-            <div class="space-y-3" id="dict-list"></div>
+            <div id="dict-list" class="space-y-3"></div>
         </section>
 
-        <!-- 4. Wrong Notes -->
+        <!-- 4. Stats Section -->
         <section id="section-stats" class="section hidden-section">
             <div class="one-ui-card p-6">
-                <h3 class="text-lg font-bold mb-4">내 오답 노트</h3>
+                <h3 class="text-lg font-bold mb-4 text-center">내 오답 노트</h3>
                 <div id="wrong-list" class="space-y-3"></div>
-                <div id="empty-stats" class="text-center py-10 text-gray-400">오답이 없습니다!</div>
+                <div id="empty-stats" class="text-center py-10 text-gray-400">오답이 없습니다! 멋져요!</div>
             </div>
-            <button onclick="clearStats()" class="w-full py-4 text-red-500 font-medium">기록 초기화</button>
+            <button onclick="clearStats()" class="w-full py-4 text-red-500 font-medium">학습 기록 초기화</button>
         </section>
-
     </main>
 
+    <!-- 복구된 디자인의 플로팅 바 -->
     <nav class="floating-bar">
-        <button onclick="switchTab('quiz')" id="nav-quiz" class="nav-item active"><i class="fas fa-edit"></i>퀴즈</button>
-        <button onclick="switchTab('compare')" id="nav-compare" class="nav-item"><i class="fas fa-columns"></i>비교</button>
-        <button onclick="switchTab('dict')" id="nav-dict" class="nav-item"><i class="fas fa-book"></i>사전</button>
-        <button onclick="switchTab('stats')" id="nav-stats" class="nav-item"><i class="fas fa-clipboard-list"></i>오답</button>
+        <div class="nav-container">
+            <button onclick="switchTab('quiz')" id="nav-quiz" class="nav-item active">
+                <i class="fas fa-edit"></i>퀴즈
+            </button>
+            <button onclick="switchTab('compare')" id="nav-compare" class="nav-item">
+                <i class="fas fa-columns"></i>비교
+            </button>
+            <button onclick="switchTab('dict')" id="nav-dict" class="nav-item">
+                <i class="fas fa-book"></i>사전
+            </button>
+            <button onclick="switchTab('stats')" id="nav-stats" class="nav-item">
+                <i class="fas fa-clipboard-list"></i>오답
+            </button>
+        </div>
     </nav>
 
     <script>
         var climateData = [
-            { id: 'Af', name: '열대 우림', desc: '연중 고온 다우, 건기 없음. 가장 비가 많이 옴.', temp: [26, 27, 27, 26, 27, 26, 26, 27, 27, 27, 26, 26], rain: [250, 230, 280, 260, 240, 210, 200, 220, 240, 250, 260, 270], tip: '강수량 막대가 연중 높게 유지됨.' },
-            { id: 'Am', name: '열대 몬순', desc: '짧은 건기, 여름에 비가 엄청나게 옴.', temp: [25, 26, 28, 29, 28, 27, 26, 26, 27, 27, 26, 25], rain: [10, 20, 50, 150, 400, 600, 700, 550, 400, 200, 80, 20], tip: '특정 달에 강수량이 폭발적으로 높음.' },
-            { id: 'Aw', name: '사바나', desc: '뚜렷한 건기와 우기. 동물의 왕국 배경.', temp: [24, 25, 27, 28, 27, 25, 24, 24, 25, 26, 25, 24], rain: [5, 5, 20, 80, 200, 250, 300, 280, 180, 60, 10, 5], tip: '겨울철 강수량이 거의 0에 가까움.' },
-            { id: 'BS', name: '스텝', desc: '연 강수량 250~500mm. 짧은 풀밭.', temp: [15, 18, 22, 26, 30, 32, 33, 32, 30, 25, 20, 16], rain: [30, 35, 40, 45, 50, 20, 10, 15, 25, 40, 35, 30], tip: '강수량 막대가 낮지만 일정하게 존재함.' },
-            { id: 'BW', name: '사막', desc: '연 강수량 250mm 미만. 매우 건조.', temp: [12, 15, 20, 25, 30, 34, 36, 35, 31, 25, 18, 13], rain: [10, 12, 8, 5, 2, 0, 0, 1, 3, 7, 12, 10], tip: '강수량 막대가 거의 보이지 않음.' },
-            { id: 'H', name: '고산', desc: '연중 서늘(10~15도). 고산병 주의.', temp: [13, 13, 14, 14, 14, 14, 13, 13, 14, 14, 14, 13], rain: [50, 60, 80, 120, 150, 100, 80, 70, 130, 140, 90, 60], tip: '기온선이 일직선에 가깝고 15도 부근임.' },
-            { id: 'Cfa', name: '온난 습윤', desc: '우리나라 남부 스타일. 여름 덥고 비 많음.', temp: [4, 6, 11, 17, 22, 25, 28, 29, 24, 18, 12, 6], rain: [60, 70, 110, 130, 150, 180, 160, 190, 220, 150, 90, 60], tip: '기온 연교차가 크고 여름에 강수 집중.' },
-            { id: 'Cfb', name: '서안 해양성', desc: '유럽 스타일. 여름 시원하고 비 고르게 옴.', temp: [5, 6, 9, 12, 15, 18, 20, 20, 17, 13, 8, 6], rain: [80, 70, 75, 70, 75, 80, 85, 90, 85, 95, 90, 95], tip: '강수량 막대 높이가 1년 내내 비슷함.' },
-            { id: 'Cs', name: '지중해성', desc: '여름 덥고 건조, 겨울 비 많이 옴.', temp: [10, 11, 13, 16, 20, 24, 27, 27, 24, 19, 14, 11], rain: [120, 100, 80, 50, 20, 5, 2, 5, 25, 60, 100, 130], tip: '기온이 높은 여름에 강수량이 V자로 파임.' },
-            { id: 'Cw', name: '온대 겨울 건조', desc: '겨울이 매우 건조한 온대 기후.', temp: [12, 14, 18, 22, 26, 28, 29, 28, 26, 22, 18, 14], rain: [10, 15, 30, 80, 180, 250, 350, 320, 200, 60, 20, 10], tip: '온대 기후 중 겨울 강수량이 가장 적음.' },
-            { id: 'Dw', name: '냉대 겨울 건조', desc: '매우 추운 겨울, 큰 연교차.', temp: [-15, -10, 0, 10, 18, 22, 25, 24, 18, 8, -5, -12], rain: [5, 8, 15, 40, 70, 120, 200, 180, 80, 30, 15, 7], tip: '기온선이 영하 아래로 깊게 내려감.' },
-            { id: 'Df', name: '냉대 습윤', desc: '겨울 춥지만 비/눈은 고르게 옴.', temp: [-10, -7, -2, 6, 13, 18, 21, 20, 14, 6, -2, -8], rain: [50, 45, 50, 60, 70, 80, 90, 85, 75, 65, 60, 55], tip: '냉대 중 강수 막대가 비교적 일정함.' },
-            { id: 'ET', name: '툰드라', desc: '여름에만 살짝 0도 위로 올라감.', temp: [-25, -23, -18, -10, -2, 4, 8, 7, 1, -8, -16, -22], rain: [10, 10, 15, 15, 20, 30, 40, 45, 35, 25, 20, 15], tip: '기온선 대부분이 영하, 여름만 0~10도.' },
-            { id: 'EF', name: '빙설', desc: '연중 영하권. 남극/북극 중심.', temp: [-40, -38, -35, -30, -25, -22, -20, -21, -26, -32, -37, -40], rain: [5, 5, 3, 2, 2, 1, 1, 1, 2, 3, 5, 5], tip: '기온선이 화면 맨 아래쪽에 깔려 있음.' }
+            { id: 'Af', name: '열대 우림', desc: '연중 고온 다우, 건기 없음.', temp: [26, 27, 27, 26, 27, 26, 26, 27, 27, 27, 26, 26], rain: [250, 230, 280, 260, 240, 210, 200, 220, 240, 250, 260, 270], tip: '강수량이 연중 내내 많음.' },
+            { id: 'Am', name: '열대 몬순', desc: '짧은 건기, 여름에 비가 폭발적으로 옴.', temp: [25, 26, 28, 29, 28, 27, 26, 26, 27, 27, 26, 25], rain: [10, 20, 50, 150, 400, 600, 700, 550, 400, 200, 80, 20], tip: '특정 달의 강수량이 매우 높음.' },
+            { id: 'Aw', name: '사바나', desc: '뚜렷한 건기와 우기 구분.', temp: [24, 25, 27, 28, 27, 25, 24, 24, 25, 26, 25, 24], rain: [5, 5, 20, 80, 200, 250, 300, 280, 180, 60, 10, 5], tip: '겨울(저온기) 강수량이 거의 0.' },
+            { id: 'BS', name: '스텝', desc: '연 강수량 250~500mm. 짧은 풀밭.', temp: [15, 18, 22, 26, 30, 32, 33, 32, 30, 25, 20, 16], rain: [30, 35, 40, 45, 50, 20, 10, 15, 25, 40, 35, 30], tip: '비가 적으나 사막보다 그래프가 높음.' },
+            { id: 'BW', name: '사막', desc: '연 강수량 250mm 미만. 매우 건조.', temp: [12, 15, 20, 25, 30, 34, 36, 35, 31, 25, 18, 13], rain: [10, 12, 8, 5, 2, 0, 0, 1, 3, 7, 12, 10], tip: '강수 막대가 거의 안 보임.' },
+            { id: 'H', name: '고산', desc: '연중 10~15도 내외로 서늘(상춘 기후).', temp: [13, 13, 14, 14, 14, 14, 13, 13, 14, 14, 14, 13], rain: [50, 60, 80, 120, 150, 100, 80, 70, 130, 140, 90, 60], tip: '기온 연교차가 거의 없음(일직선).' },
+            { id: 'Cfa', name: '온난 습윤', desc: '여름 덥고 습함. 계절풍 영향.', temp: [4, 6, 11, 17, 22, 25, 28, 29, 24, 18, 12, 6], rain: [60, 70, 110, 130, 150, 180, 160, 190, 220, 150, 90, 60], tip: '온대 중 기온 연교차가 가장 큼.' },
+            { id: 'Cfb', name: '서안 해양성', desc: '여름 시원, 연중 고른 강수.', temp: [5, 6, 9, 12, 15, 18, 20, 20, 17, 13, 8, 6], rain: [80, 70, 75, 70, 75, 80, 85, 90, 85, 95, 90, 95], tip: '강수량이 1년 내내 일정함.' },
+            { id: 'Cs', name: '지중해성', desc: '여름 고온 건조, 겨울 온난 다우.', temp: [10, 11, 13, 16, 20, 24, 27, 27, 24, 19, 14, 11], rain: [120, 100, 80, 50, 20, 5, 2, 5, 25, 60, 100, 130], tip: '여름에 비가 안 와서 V자 모양.' },
+            { id: 'Cw', name: '온대 겨울 건조', desc: '여름 다우, 겨울 매우 건조.', temp: [12, 14, 18, 22, 26, 28, 29, 28, 26, 22, 18, 14], rain: [10, 15, 30, 80, 180, 250, 350, 320, 200, 60, 20, 10], tip: '온대 기후 중 겨울 강수량이 최저.' },
+            { id: 'Dw', name: '냉대 겨울 건조', desc: '겨울 매우 춥고 건조. 큰 연교차.', temp: [-15, -10, 0, 10, 18, 22, 25, 24, 18, 8, -5, -12], rain: [5, 8, 15, 40, 70, 120, 200, 180, 80, 30, 15, 7], tip: '최한월 기온이 영하 3도 미만.' },
+            { id: 'Df', name: '냉대 습윤', desc: '겨울 춥고 강수는 고름.', temp: [-10, -7, -2, 6, 13, 18, 21, 20, 14, 6, -2, -8], rain: [50, 45, 50, 60, 70, 80, 90, 85, 75, 65, 60, 55], tip: '냉대 기후면서 강수 막대가 일정함.' },
+            { id: 'ET', name: '툰드라', desc: '여름에만 살짝 0도 위로 올라감.', temp: [-25, -23, -18, -10, -2, 4, 8, 7, 1, -8, -16, -22], rain: [10, 10, 15, 15, 20, 30, 40, 45, 35, 25, 20, 15], tip: '최난월 기온이 0~10도 사이.' },
+            { id: 'EF', name: '빙설', desc: '연중 영하권. 식생 불가능.', temp: [-40, -38, -35, -30, -25, -22, -20, -21, -26, -32, -37, -40], rain: [5, 5, 3, 2, 2, 1, 1, 1, 2, 3, 5, 5], tip: '모든 달의 기온이 0도 미만.' }
         ];
 
-        var quizQueue = [], qIdx = 0, qChart = null, cChart1 = null, cChart2 = null;
+        var qChart = null, cChart1 = null, cChart2 = null;
+        var quizQueue = [], qIdx = 0;
         var wrongAnswers = JSON.parse(localStorage.getItem('climate_master_wrong')) || [];
 
         function switchTab(tab) {
-            document.querySelectorAll('.section').forEach(function(s){s.classList.add('hidden-section')});
-            document.querySelectorAll('.nav-item').forEach(function(n){n.classList.remove('active')});
+            var sections = ['quiz', 'compare', 'dict', 'stats'];
+            for(var i=0; i<sections.length; i++) {
+                document.getElementById('section-' + sections[i]).classList.add('hidden-section');
+                document.getElementById('nav-' + sections[i]).classList.remove('active');
+            }
             document.getElementById('section-' + tab).classList.remove('hidden-section');
             document.getElementById('nav-' + tab).classList.add('active');
+            
             if(tab === 'stats') renderStats();
             if(tab === 'dict') renderDict();
             if(tab === 'compare') initCompare();
+            
+            window.scrollTo(0, 0);
         }
 
         function initQuiz() {
@@ -225,13 +255,14 @@
         }
 
         function showQuestion() {
-            if(qIdx >= quizQueue.length) { alert('완료!'); initQuiz(); return; }
+            if(qIdx >= quizQueue.length) { alert('한 바퀴를 다 돌았습니다! 다시 시작합니다.'); initQuiz(); return; }
             var item = quizQueue[qIdx];
             document.getElementById('counter-text').innerText = (qIdx+1) + " / " + quizQueue.length;
             document.getElementById('feedback').classList.add('hidden-section');
             document.getElementById('next-btn').classList.add('hidden-section');
             
-            renderClimateChart('quizChart', item, true);
+            renderChart('quizChart', item);
+            
             var choices = [item];
             var others = climateData.filter(function(d){return d.id !== item.id});
             shuffle(others);
@@ -253,13 +284,13 @@
             var fb = document.getElementById('feedback');
             if(sid === cid) {
                 btn.classList.add('correct');
-                fb.innerText = "정답! " + getClimate(cid).tip;
-                fb.className = "p-4 rounded-2xl text-center font-bold mb-4 bg-green-100 text-green-700";
+                fb.innerText = "정답! 💡 " + getClimate(cid).tip;
+                fb.className = "p-4 rounded-2xl text-center font-bold mb-4 bg-green-50 text-green-700 border border-green-200";
                 wrongAnswers = wrongAnswers.filter(function(w){return w.id !== cid});
             } else {
                 btn.classList.add('wrong');
-                fb.innerText = "오답. 정답은 ["+getClimate(cid).name+"]입니다. 팁: " + getClimate(cid).tip;
-                fb.className = "p-4 rounded-2xl text-center font-bold mb-4 bg-red-100 text-red-700";
+                fb.innerText = "아쉬워요. 정답은 ["+getClimate(cid).name+"]입니다.";
+                fb.className = "p-4 rounded-2xl text-center font-bold mb-4 bg-red-50 text-red-700 border border-red-200";
                 if(!wrongAnswers.find(function(w){return w.id === cid})) {
                     wrongAnswers.push({id: cid, name: getClimate(cid).name});
                 }
@@ -269,17 +300,17 @@
             document.getElementById('next-btn').classList.remove('hidden-section');
         }
 
-        function renderClimateChart(canvasId, data, isQuiz) {
+        function renderChart(canvasId, data) {
             var ctx = document.getElementById(canvasId).getContext('2d');
-            var chartObj = (canvasId === 'quizChart') ? qChart : (canvasId === 'compareChart1' ? cChart1 : cChart2);
-            if(chartObj) chartObj.destroy();
+            var target = (canvasId === 'quizChart') ? qChart : (canvasId === 'compareChart1' ? cChart1 : cChart2);
+            if(target) target.destroy();
             
             var newChart = new Chart(ctx, {
                 type: 'bar',
                 data: {
                     labels: ['1','2','3','4','5','6','7','8','9','10','11','12'],
                     datasets: [{
-                        label: '기온', data: data.temp, type: 'line', borderColor: '#ff3b30', pointRadius: 2, borderWidth: 2, yAxisID: 'y-temp', fill: false
+                        label: '기온', data: data.temp, type: 'line', borderColor: '#ff3b30', pointRadius: 3, borderWidth: 3, yAxisID: 'y-temp', fill: false, lineTension: 0.1
                     }, {
                         label: '강수', data: data.rain, backgroundColor: 'rgba(0, 122, 255, 0.5)', yAxisID: 'y-rain'
                     }]
@@ -288,8 +319,8 @@
                     responsive: true, maintainAspectRatio: false,
                     legend: { display: false },
                     scales: {
-                        yAxes: [{ id: 'y-temp', position: 'left', ticks: { min: -50, max: 40, fontSize: 8 } },
-                                { id: 'y-rain', position: 'right', ticks: { min: 0, max: 800, fontSize: 8 }, gridLines: { display: false } }]
+                        yAxes: [{ id: 'y-temp', position: 'left', ticks: { min: -50, max: 40, fontSize: 10, fontColor: '#666' }, gridLines: { color: '#eee' } },
+                                { id: 'y-rain', position: 'right', ticks: { min: 0, max: 800, fontSize: 10, fontColor: '#666' }, gridLines: { display: false } }]
                     }
                 }
             });
@@ -302,10 +333,9 @@
             var s1 = document.getElementById('select-1');
             var s2 = document.getElementById('select-2');
             if(s1.options.length > 0) return;
-            climateData.forEach(function(d, i) {
-                var opt1 = new Option(d.name, d.id);
-                var opt2 = new Option(d.name, d.id);
-                s1.add(opt1); s2.add(opt2);
+            climateData.forEach(function(d) {
+                s1.add(new Option(d.name, d.id));
+                s2.add(new Option(d.name, d.id));
             });
             s2.selectedIndex = 1;
             updateComparison();
@@ -314,16 +344,14 @@
         function updateComparison() {
             var id1 = document.getElementById('select-1').value;
             var id2 = document.getElementById('select-2').value;
-            var d1 = getClimate(id1), d2 = getClimate(id2);
-            renderClimateChart('compareChart1', d1, false);
-            renderClimateChart('compareChart2', d2, false);
-            
-            var diffText = "<strong>분석:</strong> ";
-            if(id1 === id2) { diffText += "같은 기후입니다."; }
-            else {
-                diffText += d1.name + "은(는) " + d1.tip + " 반면, " + d2.name + "은(는) " + d2.tip;
-            }
-            document.getElementById('comparison-points').innerHTML = diffText;
+            var c1 = getClimate(id1);
+            var c2 = getClimate(id2);
+            renderChart('compareChart1', c1);
+            renderChart('compareChart2', c2);
+            document.getElementById('comparison-points').innerHTML = 
+                "<strong>" + c1.name + "</strong>: " + c1.tip + "<br>" +
+                "<div class='my-2 border-t border-blue-100'></div>" +
+                "<strong>" + c2.name + "</strong>: " + c2.tip;
         }
 
         function renderDict() {
@@ -332,7 +360,7 @@
             climateData.forEach(function(d) {
                 var card = document.createElement('div');
                 card.className = 'one-ui-card p-4';
-                card.innerHTML = "<h4 class='font-bold text-blue-600'>"+d.name+"</h4><p class='text-sm text-gray-600 mt-1'>"+d.desc+"</p><p class='text-xs text-orange-500 mt-2'>💡 구별 팁: "+d.tip+"</p>";
+                card.innerHTML = "<h4 class='font-bold text-blue-600'>" + d.name + " (" + d.id + ")</h4><p class='text-sm text-gray-700 mt-1'>" + d.desc + "</p><p class='text-xs text-orange-600 mt-2 font-bold'>💡 암기 팁: " + d.tip + "</p>";
                 list.appendChild(card);
             });
         }
@@ -346,20 +374,19 @@
             wrongAnswers.forEach(function(w) {
                 var d = getClimate(w.id);
                 var div = document.createElement('div');
-                div.className = 'p-4 bg-gray-50 rounded-xl border border-gray-100';
-                div.innerHTML = "<div class='font-bold'>"+d.name+"</div><div class='text-xs text-gray-500 mt-1'>"+d.tip+"</div>";
+                div.className = 'p-4 bg-gray-50 rounded-xl border border-gray-200';
+                div.innerHTML = "<div class='font-bold'>" + d.name + "</div><div class='text-xs text-gray-500 mt-1'>" + d.tip + "</div>";
                 list.appendChild(div);
             });
         }
 
-        function getClimate(id) { return climateData.find(function(d){return d.id === id}); }
+        function getClimate(id) { return climateData.filter(function(d){return d.id === id})[0]; }
         function shuffle(a) { return a.sort(function(){return Math.random()-0.5}); }
         function nextQuestion() { qIdx++; showQuestion(); }
-        function clearStats() { if(confirm('초기화?')){wrongAnswers=[]; localStorage.removeItem('climate_master_wrong'); renderStats();} }
+        function clearStats() { if(confirm('모든 기록을 삭제하시겠습니까?')){wrongAnswers=[]; localStorage.removeItem('climate_master_wrong'); renderStats();} }
 
         window.onload = function() { initQuiz(); };
     </script>
 </body>
 </html>
 
-```
