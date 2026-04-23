@@ -3,227 +3,259 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>기후 마스터 - Extreme Final</title>
+    <title>기후 마스터 - 초밀착 D-4</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@2.9.4/dist/Chart.min.js"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@400;600;700;800&display=swap');
         
+        :root {
+            --primary: #2563eb;
+            --danger: #ef4444;
+            --success: #22c55e;
+        }
+
         body {
-            font-family: 'Pretendard', -apple-system, sans-serif;
-            background-color: #f1f5f9;
-            color: #0f172a;
-            -webkit-tap-highlight-color: transparent;
+            font-family: 'Pretendard', sans-serif;
+            background-color: #f8fafc;
+            color: #1e293b;
+            overflow-x: hidden;
+            word-break: keep-all;
         }
 
+        /* 스크롤 시 작아지는 플로팅 네비게이션 */
+        .floating-nav {
+            position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+            width: 90%; max-width: 480px; height: 72px;
+            background: rgba(255, 255, 255, 0.9); backdrop-filter: blur(12px);
+            border-radius: 36px; box-shadow: 0 12px 30px rgba(0,0,0,0.12);
+            display: flex; justify-content: space-around; align-items: center;
+            z-index: 1000; border: 1px solid rgba(255,255,255,0.3);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .floating-nav.shrunk {
+            height: 56px; bottom: 16px; width: 80%; opacity: 0.95;
+        }
+        .nav-item {
+            flex: 1; display: flex; flex-direction: column; align-items: center;
+            color: #64748b; font-size: 11px; font-weight: 700; transition: 0.2s;
+        }
+        .nav-item i { font-size: 20px; margin-bottom: 4px; transition: 0.2s; }
+        .shrunk .nav-item i { font-size: 18px; margin-bottom: 0; }
+        .shrunk .nav-item span { display: none; }
+        .nav-item.active { color: var(--primary); }
+
+        /* 카드 및 레이아웃 */
+        .main-content { padding-bottom: 120px; }
         .glass-card {
-            background: #ffffff;
-            border-radius: 24px;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
-            border: 1px solid #e2e8f0;
-            overflow: hidden;
-            margin-bottom: 1rem;
+            background: white; border-radius: 24px; border: 1px solid #e2e8f0;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.02); overflow: hidden;
         }
 
-        /* 퀴즈 UI */
-        .timer-bar-container { width: 100%; height: 6px; background: #fee2e2; margin-bottom: 12px; border-radius: 3px; overflow: hidden; }
-        .timer-bar { height: 100%; background: #ef4444; width: 100%; transition: width 0.1s linear; }
+        /* 기후 매트릭스 칩 */
+        .matrix-chip {
+            padding: 4px 10px; border-radius: 8px; font-size: 11px; font-weight: 800;
+        }
+        .chip-temp { background: #fee2e2; color: #ef4444; }
+        .chip-rain { background: #e0f2fe; color: #0284c7; }
+
+        /* 타이머 애니메이션 */
+        .timer-bg { width: 100%; height: 6px; background: #f1f5f9; border-radius: 3px; overflow: hidden; }
+        .timer-fill { height: 100%; background: var(--danger); width: 100%; transition: width 0.1s linear; }
+
+        /* 차트 높이 조절 */
+        .chart-container { position: relative; height: 320px; width: 100%; }
+        .stat-chart-container { height: 200px; }
+
+        @media (min-width: 768px) {
+            .chart-container { height: 450px; }
+            .grid-cols-tablet { grid-template-columns: repeat(2, 1fr); }
+        }
         
-        .chart-wrapper { position: relative; width: 100%; height: 350px; padding: 10px; }
-        .compare-chart { height: 220px; width: 100%; }
-
         .choice-btn {
-            width: 100%; padding: 16px; border-radius: 16px;
-            background: #f8fafc; border: 2px solid #cbd5e1;
-            font-weight: 700; color: #334155;
-            transition: all 0.1s;
+            background: #f8fafc; border: 2px solid #e2e8f0;
+            padding: 18px; border-radius: 20px; font-weight: 700;
+            text-align: left; transition: all 0.2s; display: flex; justify-content: space-between;
         }
-        .choice-btn:active { transform: scale(0.98); }
+        .choice-btn:active { transform: scale(0.97); }
         .choice-btn.correct { background: #dcfce7; border-color: #22c55e; color: #166534; }
         .choice-btn.wrong { background: #fee2e2; border-color: #ef4444; color: #991b1b; }
 
-        /* 하단 네비게이션 */
-        .bottom-nav {
-            position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
-            width: 90%; max-width: 500px; height: 70px;
-            background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px);
-            border-radius: 35px; box-shadow: 0 10px 25px rgba(0,0,0,0.1);
-            display: flex; justify-content: space-around; align-items: center; z-index: 100;
-            border: 1px solid #e2e8f0;
-        }
-        .nav-item {
-            display: flex; flex-direction: column; align-items: center; justify-content: center;
-            flex: 1; height: 100%; color: #94a3b8; font-size: 11px; font-weight: 700;
-            cursor: pointer;
-        }
-        .nav-item i { font-size: 20px; margin-bottom: 4px; }
-        .nav-item.active { color: #3b82f6; }
-
-        .hidden-sec { display: none !important; }
-
-        /* 태블릿, 데스크톱 레이아웃 */
-        @media (min-width: 768px) {
-            .app-container { max-width: 800px; margin: 40px auto; padding: 0 20px; }
-            .choices-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-            .grid-2col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-            .chart-wrapper { height: 400px; }
-            .compare-chart { height: 280px; }
-        }
+        .hidden-section { display: none !important; }
     </style>
 </head>
-<body class="pb-32">
+<body>
 
-<div class="app-container px-4 mt-6">
-    <header class="mb-6">
-        <h1 class="text-2xl md:text-3xl font-extrabold text-slate-800 tracking-tight">🔥 D-4 기후 마스터</h1>
-        <p class="text-slate-500 font-semibold mt-1">오답 유도 선지 & 무한 비교 모드</p>
+<div class="max-w-4xl mx-auto px-4 pt-8 main-content">
+    <!-- Header -->
+    <header class="flex justify-between items-center mb-8">
+        <div>
+            <h1 class="text-3xl font-black text-slate-900 leading-tight">Climate<br><span class="text-blue-600">Final D-4</span></h1>
+        </div>
+        <div class="text-right">
+            <div id="mastery-label" class="text-xs font-black text-blue-500 mb-1">MASTERY 0%</div>
+            <div class="w-24 h-2 bg-slate-200 rounded-full overflow-hidden">
+                <div id="mastery-bar" class="h-full bg-blue-600 w-0 transition-all duration-500"></div>
+            </div>
+        </div>
     </header>
 
-    <!-- 1. 타임어택 퀴즈 -->
-    <section id="sec-quiz" class="section">
-        <div class="glass-card p-4 md:p-6">
-            <div class="flex justify-between items-center mb-3">
-                <span class="bg-red-100 text-red-600 px-3 py-1 rounded-full text-xs font-bold"><i class="fas fa-stopwatch mr-1"></i> 하드코어 10초</span>
-                <span id="quiz-counter" class="font-bold text-slate-600">1 / 14</span>
+    <!-- Quiz Section -->
+    <section id="view-quiz">
+        <div class="glass-card p-4 md:p-6 mb-6">
+            <div class="flex justify-between items-center mb-4">
+                <div id="q-type-badge" class="flex gap-2">
+                    <!-- Matrix Chips Injection -->
+                </div>
+                <div id="q-count" class="text-sm font-bold text-slate-400">01 / 14</div>
             </div>
-            <div class="timer-bar-container"><div id="timer-bar" class="timer-bar"></div></div>
-            <div class="chart-wrapper"><canvas id="quizChart"></canvas></div>
-        </div>
-        
-        <div id="choices-grid" class="choices-grid mt-4 flex flex-col gap-3">
-            <!-- 동적 버튼 생성 -->
+            <div class="timer-bg mb-4"><div id="timer-fill" class="timer-fill"></div></div>
+            <div class="chart-container"><canvas id="mainChart"></canvas></div>
         </div>
 
-        <div id="feedback-alert" class="hidden-sec mt-4 p-4 rounded-xl font-bold text-center border"></div>
-        <button id="next-btn" onclick="app.nextQuiz()" class="hidden-sec w-full mt-4 py-4 bg-slate-800 text-white rounded-xl font-bold text-lg hover:bg-slate-700">
-            다음 문제
+        <div id="choice-grid" class="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <!-- Choice Buttons -->
+        </div>
+
+        <div id="quiz-feedback" class="hidden-section mt-4 p-5 rounded-3xl border-2 text-center animate-bounce"></div>
+        
+        <button id="btn-next" onclick="game.nextQuestion()" class="hidden-section w-full mt-4 py-5 bg-slate-900 text-white rounded-3xl font-black text-lg shadow-xl">
+            다음 문제 <i class="fas fa-chevron-right ml-2"></i>
         </button>
     </section>
 
-    <!-- 2. 무한 데스매치 (14x13) -->
-    <section id="sec-deathmatch" class="section hidden-sec">
-        <div class="glass-card p-4 md:p-6">
-            <h3 class="text-lg font-extrabold mb-4 text-center">⚔️ 1:1 기후 비교 분석실</h3>
+    <!-- Deathmatch (무한 비교) Section -->
+    <section id="view-deathmatch" class="hidden-section">
+        <div class="glass-card p-5">
+            <h2 class="text-xl font-black mb-6 text-center">⚔️ 무한 기후 비교기</h2>
             
-            <div class="flex flex-col md:flex-row gap-3 mb-4">
-                <select id="dm-sel-1" onchange="app.renderDeathmatch()" class="flex-1 p-3 rounded-lg border border-slate-300 font-bold bg-slate-50 outline-none"></select>
-                <div class="text-center font-bold text-slate-400 self-center hidden md:block">VS</div>
-                <select id="dm-sel-2" onchange="app.renderDeathmatch()" class="flex-1 p-3 rounded-lg border border-slate-300 font-bold bg-slate-50 outline-none"></select>
+            <div class="flex flex-col md:flex-row gap-3 mb-6">
+                <select id="dm-1" onchange="game.updateDM()" class="flex-1 p-4 rounded-2xl border-2 border-slate-100 bg-slate-50 font-bold outline-none focus:border-blue-500"></select>
+                <div class="flex items-center justify-center font-black text-slate-300">VS</div>
+                <select id="dm-2" onchange="game.updateDM()" class="flex-1 p-4 rounded-2xl border-2 border-slate-100 bg-slate-50 font-bold outline-none focus:border-blue-500"></select>
             </div>
 
-            <div class="grid-2col">
-                <div class="bg-white rounded-xl border p-2">
-                    <div id="dm-name-1" class="text-center font-bold text-blue-600 mb-2 text-sm"></div>
-                    <div class="compare-chart"><canvas id="dmChart1"></canvas></div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="p-3 bg-slate-50 rounded-2xl border border-slate-100">
+                    <div id="dm-name-1" class="text-center font-black text-blue-600 mb-2">기후 A</div>
+                    <div class="stat-chart-container"><canvas id="dmChart1"></canvas></div>
+                    <div id="dm-matrix-1" class="mt-2 flex justify-center gap-2"></div>
                 </div>
-                <div class="bg-white rounded-xl border p-2 mt-4 md:mt-0">
-                    <div id="dm-name-2" class="text-center font-bold text-red-500 mb-2 text-sm"></div>
-                    <div class="compare-chart"><canvas id="dmChart2"></canvas></div>
+                <div class="p-3 bg-slate-50 rounded-2xl border border-slate-100">
+                    <div id="dm-name-2" class="text-center font-black text-red-500 mb-2">기후 B</div>
+                    <div class="stat-chart-container"><canvas id="dmChart2"></canvas></div>
+                    <div id="dm-matrix-2" class="mt-2 flex justify-center gap-2"></div>
                 </div>
             </div>
 
-            <div id="dm-analysis" class="mt-4 p-4 bg-slate-100 rounded-xl text-sm leading-relaxed border border-slate-200">
-                <!-- 분석 텍스트 -->
+            <div id="dm-desc" class="mt-6 p-5 bg-blue-50 rounded-2xl border border-blue-100 text-blue-900 text-sm leading-relaxed">
+                두 기후를 선택하여 차이점을 분석하세요.
             </div>
         </div>
     </section>
 
-    <!-- 3. 스마트 오답노트 -->
-    <section id="sec-stats" class="section hidden-sec">
-        <div class="glass-card p-4 md:p-6">
-            <h3 class="text-lg font-extrabold mb-2">🧠 내가 헷갈린 기후들</h3>
-            <p class="text-sm text-slate-500 mb-4">정답과 내가 찍은 오답을 직접 비교하세요.</p>
+    <!-- Stats (스마트 오답노트) Section -->
+    <section id="view-stats" class="hidden-section">
+        <div class="glass-card p-6">
+            <h2 class="text-xl font-black mb-2">🧠 오답 원인 분석</h2>
+            <p class="text-sm text-slate-500 mb-8">내가 헷갈렸던 순간들을 시각적으로 비교합니다.</p>
             
-            <div id="wrong-list" class="space-y-6">
-                <!-- 오답 아이템 동적 생성 -->
+            <div id="wrong-container" class="space-y-10">
+                <!-- Wrong items -->
             </div>
-            
-            <button onclick="app.resetStats()" class="w-full mt-6 py-4 text-red-500 font-bold bg-white rounded-xl border border-red-200">
-                오답 기록 모두 지우기
-            </button>
         </div>
     </section>
-
 </div>
 
-<nav class="bottom-nav">
-    <div class="nav-item active" onclick="app.switchTab('quiz', this)">
-        <i class="fas fa-bolt"></i><span>타임어택</span>
+<!-- Nav Bar -->
+<nav id="navbar" class="floating-nav">
+    <div class="nav-item active" onclick="game.nav('quiz', this)">
+        <i class="fas fa-play-circle"></i><span>실전퀴즈</span>
     </div>
-    <div class="nav-item" onclick="app.switchTab('deathmatch', this)">
-        <i class="fas fa-balance-scale"></i><span>무한비교</span>
+    <div class="nav-item" onclick="game.nav('deathmatch', this)">
+        <i class="fas fa-layer-group"></i><span>무한비교</span>
     </div>
-    <div class="nav-item" onclick="app.switchTab('stats', this)">
-        <i class="fas fa-book-medical"></i><span>오답분석</span>
+    <div class="nav-item" onclick="game.nav('stats', this)">
+        <i class="fas fa-brain"></i><span>오답분석</span>
     </div>
 </nav>
 
 <script>
-    // --- 1. Data Source (그룹핑하여 매력적 오답 생성에 활용) ---
-    const climateData = [
-        { id: 'Af', group: 'A', name: '열대 우림 (Af)', temp: [26,27,27,26,27,26,26,27,27,27,26,26], rain: [250,230,280,260,240,210,200,220,240,250,260,270], tip: '연중 비가 많이 와 강수 막대가 빽빽함.' },
-        { id: 'Am', group: 'A', name: '열대 몬순 (Am)', temp: [25,26,28,29,28,27,26,26,27,27,26,25], rain: [10,20,50,150,400,600,750,650,400,200,80,20], tip: '여름에 비가 비정상적으로 많이 쏟아짐.' },
-        { id: 'Aw', group: 'A', name: '사바나 (Aw)', temp: [24,25,27,28,27,25,24,24,25,26,25,24], rain: [5,5,20,80,200,250,300,280,180,60,10,5], tip: '겨울(저온기)에 비가 전혀 안 오는 뚜렷한 건기.' },
-        
-        { id: 'BS', group: 'B', name: '스텝 (BS)', temp: [15,18,22,26,30,32,33,32,30,25,20,16], rain: [30,35,40,45,50,20,10,15,25,40,35,30], tip: '건조하지만 짧은 풀이 자랄 만큼의 비(250~500mm)는 옴.' },
-        { id: 'BW', group: 'B', name: '사막 (BW)', temp: [12,15,20,25,30,34,36,35,31,25,18,13], rain: [10,12,8,5,2,0,0,1,3,7,12,10], tip: '강수 막대가 바닥에 딱 붙어있음.' },
-        
-        { id: 'Cfa',group: 'C', name: '온난 습윤 (Cfa)', temp: [4,6,11,17,22,25,28,29,24,18,12,6], rain: [60,70,110,130,150,180,160,190,220,150,90,60], tip: '온대 중 기온 연교차가 크고 여름에 덥고 비 많음.' },
-        { id: 'Cfb',group: 'C', name: '서안 해양성 (Cfb)', temp: [5,6,9,12,15,18,20,20,17,13,8,6], rain: [80,70,75,70,75,80,85,90,85,95,90,95], tip: '온대 중 1년 내내 강수량이 가장 고름.' },
-        { id: 'Cs', group: 'C', name: '지중해성 (Cs)', temp: [10,11,13,16,20,24,27,27,24,19,14,11], rain: [120,100,80,50,20,5,2,5,25,60,100,130], tip: '기온이 높은 여름에 비가 안 와서 강수가 V자로 파임.' },
-        { id: 'Cw', group: 'C', name: '온대 겨울 건조 (Cw)', temp: [12,14,18,22,26,28,29,28,26,22,18,14], rain: [10,15,30,80,180,250,350,320,200,60,20,10], tip: '온대인데 겨울에 비가 극단적으로 안 옴.' },
-        
-        { id: 'Df', group: 'D', name: '냉대 습윤 (Df)', temp: [-10,-7,-2,6,13,18,21,20,14,6,-2,-8], rain: [50,45,50,60,70,80,90,85,75,65,60,55], tip: '기온이 영하로 떨어지는 추운 겨울에도 눈/비가 고르게 옴.' },
-        { id: 'Dw', group: 'D', name: '냉대 겨울 건조 (Dw)', temp: [-15,-10,0,10,18,22,25,24,18,8,-5,-12], rain: [5,8,15,40,70,120,200,180,80,30,15,7], tip: '겨울이 몹시 춥고(영하 깊게 파임) 건조함.' },
-        
-        { id: 'ET', group: 'E', name: '툰드라 (ET)', temp: [-25,-23,-18,-10,-2,4,8,7,1,-8,-16,-22], rain: [10,10,15,15,20,30,40,45,35,25,20,15], tip: '여름 짧은 기간만 기온이 0~10도 사이로 살짝 올라감.' },
-        { id: 'EF', group: 'E', name: '빙설 (EF)', temp: [-40,-38,-35,-30,-25,-22,-20,-21,-26,-32,-37,-40], rain: [5,5,3,2,2,1,1,1,2,3,5,5], tip: '1년 내내 0도 아래. 바닥에 기온선이 붙어있음.' },
-        
-        { id: 'H',  group: 'H', name: '고산 (H)', temp: [13,13,14,14,14,14,13,13,14,14,14,13], rain: [50,60,80,120,150,100,80,70,130,140,90,60], tip: '기온선이 10도 언저리에서 수평선(일직선)을 그림.' }
+    // --- Data Definition (연교차/강수패턴 구조화) ---
+    // 연교차(Temp Range): 소(<10), 중(10~25), 대(>25)
+    // 강수패턴(Rain Type): 연중습윤, 우건기뚜렷, 연중건조
+    const CLIMATES = [
+        { id: 'Af', name: '열대우림(Af)', tr: '소', rt: '연중습윤', temp: [26,27,27,26,27,26,26,27,27,27,26,26], rain: [250,230,280,260,240,210,200,220,240,250,260,270], tip: '최한월 18도 이상, 모든 달 강수 60mm 이상.' },
+        { id: 'Am', name: '열대몬순(Am)', tr: '소', rt: '우건기뚜렷', temp: [25,26,28,29,28,27,26,26,27,27,26,25], rain: [10,20,50,150,400,600,750,650,400,200,80,20], tip: '짧은 건기가 있으나 여름 강수가 압도적.' },
+        { id: 'Aw', name: '사바나(Aw)', tr: '소', rt: '우건기뚜렷', temp: [24,25,27,28,27,25,24,24,25,26,25,24], rain: [5,5,20,80,200,250,300,280,180,60,10,5], tip: '겨울 건기가 매우 뚜렷함(강수 0에 근접).' },
+        { id: 'BS', name: '스텝(BS)', tr: '중', rt: '연중건조', temp: [15,18,22,26,30,32,33,32,30,25,20,16], rain: [30,35,40,45,50,20,10,15,25,40,35,30], tip: '연강수 250~500mm 사이.' },
+        { id: 'BW', name: '사막(BW)', tr: '중', rt: '연중건조', temp: [12,15,20,25,30,34,36,35,31,25,18,13], rain: [10,12,8,5,2,0,0,1,3,7,12,10], tip: '연강수 250mm 미만. 식생 거의 없음.' },
+        { id: 'Cfa',name: '온난습윤(Cfa)', tr: '대', rt: '연중습윤', temp: [4,6,11,17,22,25,28,29,24,18,12,6], rain: [60,70,110,130,150,180,160,190,220,150,90,60], tip: '여름 덥고(22도↑) 연중 비가 고름.' },
+        { id: 'Cfb',name: '서안해양성(Cfb)', tr: '중', rt: '연중습윤', temp: [5,6,9,12,15,18,20,20,17,13,8,6], rain: [80,70,75,70,75,80,85,90,85,95,90,95], tip: '여름 서늘하고(22도↓) 비가 매우 일정함.' },
+        { id: 'Cs', name: '지중해성(Cs)', tr: '중', rt: '우건기뚜렷', temp: [10,11,13,16,20,24,27,27,24,19,14,11], rain: [120,100,80,50,20,5,2,5,25,60,100,130], tip: '여름 고온건조. 겨울 한랭윤택.' },
+        { id: 'Cw', name: '온대겨울건조(Cw)', tr: '대', rt: '우건기뚜렷', temp: [12,14,18,22,26,28,29,28,26,22,18,14], rain: [10,15,30,80,180,250,350,320,200,60,20,10], tip: '여름 강수 집중, 겨울 매우 건조.' },
+        { id: 'Df', name: '냉대습윤(Df)', tr: '대', rt: '연중습윤', temp: [-10,-7,-2,6,13,18,21,20,14,6,-2,-8], rain: [50,45,50,60,70,80,90,85,75,65,60,55], tip: '최한월 -3도 미만, 연중 비/눈 고름.' },
+        { id: 'Dw', name: '냉대겨울건조(Dw)', tr: '대', rt: '우건기뚜렷', temp: [-15,-10,0,10,18,22,25,24,18,8,-5,-12], rain: [5,8,15,40,70,120,200,180,80,30,15,7], tip: '최한월 -3도 미만, 겨울 강수 극소.' },
+        { id: 'ET', name: '툰드라(ET)', tr: '대', rt: '연중건조', temp: [-25,-23,-18,-10,-2,4,8,7,1,-8,-16,-22], rain: [10,10,15,15,20,30,40,45,35,25,20,15], tip: '최난월 0~10도 사이. 짧은 여름.' },
+        { id: 'EF', name: '빙설(EF)', tr: '대', rt: '연중건조', temp: [-40,-38,-35,-30,-25,-22,-20,-21,-26,-32,-37,-40], rain: [5,5,3,2,2,1,1,1,2,3,5,5], tip: '모든 달이 0도 미만. 1년 내내 결빙.' },
+        { id: 'H',  name: '고산기후(H)', tr: '소', rt: '연중습윤', temp: [13,13,14,14,14,14,13,13,14,14,14,13], rain: [50,60,80,120,150,100,80,70,130,140,90,60], tip: '상춘 기후. 기온 연교차가 거의 없음.' }
     ];
 
-    // --- 2. Application Core ---
-    const app = {
-        quizQueue: [],
-        qIdx: 0,
+    const game = {
+        history: JSON.parse(localStorage.getItem('climate_ultimate_history')) || [],
+        currentIdx: 0,
         currentQ: null,
-        wrongLogs: JSON.parse(localStorage.getItem('climate_extreme_logs')) || [], // { correctId, selectedId, date }
-        charts: {},
-        timer: null,
-        timeLeft: 100,
         isAnswered: false,
+        timer: null,
+        charts: {},
 
         init() {
-            Chart.defaults.global.defaultFontFamily = "'Pretendard', sans-serif";
-            this.initDeathmatchSelectors();
-            this.startQuiz();
+            // Scroll Event for Navbar
+            let lastScroll = 0;
+            window.addEventListener('scroll', () => {
+                const nav = document.getElementById('navbar');
+                const currentScroll = window.pageYOffset;
+                if (currentScroll > 100) nav.classList.add('shrunk');
+                else nav.classList.remove('shrunk');
+                lastScroll = currentScroll;
+            });
+
+            this.initSelectors();
+            this.startNewSet();
+            this.updateMastery();
         },
 
-        switchTab(tabId, btn) {
-            clearInterval(this.timer);
-            document.querySelectorAll('.section').forEach(s => s.classList.add('hidden-sec'));
+        nav(view, el) {
+            document.querySelectorAll('section').forEach(s => s.classList.add('hidden-section'));
+            document.getElementById('view-' + view).classList.remove('hidden-section');
             document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-            document.getElementById('sec-' + tabId).classList.remove('hidden-sec');
-            btn.classList.add('active');
-            window.scrollTo(0, 0);
-
-            if (tabId === 'quiz' && !this.isAnswered) this.startTimer();
-            if (tabId === 'stats') this.renderStats();
+            el.classList.add('active');
+            if(view === 'stats') this.renderStats();
+            window.scrollTo(0,0);
         },
 
-        // Chart.js Wrapper
-        draw(canvasId, data, isSmall = false) {
-            const ctx = document.getElementById(canvasId).getContext('2d');
-            if (this.charts[canvasId]) this.charts[canvasId].destroy();
+        initSelectors() {
+            const s1 = document.getElementById('dm-1');
+            const s2 = document.getElementById('dm-2');
+            CLIMATES.forEach(c => {
+                s1.add(new Option(c.name, c.id));
+                s2.add(new Option(c.name, c.id));
+            });
+            s1.value = 'Af'; s2.value = 'Am';
+            this.updateDM();
+        },
 
-            this.charts[canvasId] = new Chart(ctx, {
+        draw(id, data, isMini = false) {
+            const ctx = document.getElementById(id).getContext('2d');
+            if(this.charts[id]) this.charts[id].destroy();
+            this.charts[id] = new Chart(ctx, {
                 type: 'bar',
                 data: {
                     labels: ['1','2','3','4','5','6','7','8','9','10','11','12'],
                     datasets: [
-                        { label: '기온', data: data.temp, type: 'line', borderColor: '#ef4444', backgroundColor: 'transparent', borderWidth: 2, pointRadius: isSmall ? 0 : 2, yAxisID: 'yTemp' },
-                        { label: '강수', data: data.rain, backgroundColor: 'rgba(59, 130, 246, 0.6)', yAxisID: 'yRain' }
+                        { label: '기온', data: data.temp, type: 'line', borderColor: '#ef4444', backgroundColor: 'transparent', borderWidth: 3, pointRadius: isMini ? 0 : 3, yAxisID: 'yT' },
+                        { label: '강수', data: data.rain, backgroundColor: 'rgba(37, 99, 235, 0.5)', yAxisID: 'yR' }
                     ]
                 },
                 options: {
@@ -231,60 +263,61 @@
                     legend: { display: false },
                     scales: {
                         yAxes: [
-                            { id: 'yTemp', position: 'left', ticks: { min: -50, max: 40, stepSize: 20, fontSize: isSmall ? 8 : 10 }, gridLines: { zeroLineColor: 'rgba(239, 68, 68, 0.4)', zeroLineWidth: 1 } },
-                            { id: 'yRain', position: 'right', ticks: { min: 0, max: 800, stepSize: 200, fontSize: isSmall ? 8 : 10 }, gridLines: { display: false } }
+                            { id: 'yT', position: 'left', ticks: { min: -50, max: 40, stepSize: 20, fontSize: 10 } },
+                            { id: 'yR', position: 'right', ticks: { min: 0, max: 800, stepSize: 200, fontSize: 10 }, gridLines: { display: false } }
                         ],
-                        xAxes: [{ gridLines: { display: false }, ticks: { fontSize: isSmall ? 8 : 10 } }]
+                        xAxes: [{ gridLines: { display: false }, ticks: { fontSize: 10 } }]
                     },
-                    animation: { duration: 0 } // 빠른 로딩
+                    animation: { duration: 400 }
                 }
             });
         },
 
-        // --- 1. Quiz (악랄한 선지 배치) ---
-        startQuiz() {
-            this.quizQueue = [...climateData].sort(() => Math.random() - 0.5);
-            this.qIdx = 0;
+        startNewSet() {
+            this.queue = [...CLIMATES].sort(() => Math.random() - 0.5);
+            this.currentIdx = 0;
             this.loadQuestion();
         },
 
         loadQuestion() {
-            if(this.qIdx >= this.quizQueue.length) {
-                alert('1세트 종료! 오답을 분석해보세요.');
-                this.startQuiz(); return;
+            if(this.currentIdx >= this.queue.length) {
+                alert('한 세트를 완료했습니다!');
+                this.startNewSet();
+                return;
             }
-
             this.isAnswered = false;
-            this.currentQ = this.quizQueue[this.qIdx];
-            document.getElementById('quiz-counter').innerText = `${this.qIdx + 1} / 14`;
-            
-            document.getElementById('feedback-alert').classList.add('hidden-sec');
-            document.getElementById('next-btn').classList.add('hidden-sec');
+            this.currentQ = this.queue[this.currentIdx];
+            document.getElementById('q-count').innerText = `${this.currentIdx + 1} / 14`;
+            document.getElementById('quiz-feedback').classList.add('hidden-section');
+            document.getElementById('btn-next').classList.add('hidden-section');
 
-            this.draw('quizChart', this.currentQ);
+            // Badge Injection
+            document.getElementById('q-type-badge').innerHTML = `
+                <span class="matrix-chip chip-temp">연교차: ${this.currentQ.tr}</span>
+                <span class="matrix-chip chip-rain">패턴: ${this.currentQ.rt}</span>
+            `;
 
-            // 매력적 오답 로직: 같은 그룹(기후대)에 속한 기후를 우선적으로 선지에 포함
+            this.draw('mainChart', this.currentQ);
+
+            // Choice Logic (매력적 오답: 같은 연교차 혹은 같은 강수패턴)
             let choices = [this.currentQ];
-            let sameGroup = climateData.filter(d => d.group === this.currentQ.group && d.id !== this.currentQ.id);
-            let others = climateData.filter(d => d.group !== this.currentQ.group);
-            
-            sameGroup.sort(() => Math.random() - 0.5);
-            others.sort(() => Math.random() - 0.5);
-
-            // 선지가 4개가 될 때까지 같은 그룹 먼저 채우고, 모자라면 다른 그룹 채움
-            while(choices.length < 4) {
-                if(sameGroup.length > 0) choices.push(sameGroup.pop());
-                else choices.push(others.pop());
-            }
+            let pool = CLIMATES.filter(c => c.id !== this.currentQ.id);
+            // 우선순위: 연교차나 패턴이 겹치는 녀석들
+            pool.sort((a, b) => {
+                let scoreA = (a.tr === this.currentQ.tr ? 1 : 0) + (a.rt === this.currentQ.rt ? 1 : 0);
+                let scoreB = (b.tr === this.currentQ.tr ? 1 : 0) + (b.rt === this.currentQ.rt ? 1 : 0);
+                return scoreB - scoreA;
+            });
+            choices.push(...pool.slice(0, 3));
             choices.sort(() => Math.random() - 0.5);
 
-            const grid = document.getElementById('choices-grid');
+            const grid = document.getElementById('choice-grid');
             grid.innerHTML = '';
             choices.forEach(c => {
                 const btn = document.createElement('button');
                 btn.className = 'choice-btn';
-                btn.innerText = c.name;
-                btn.onclick = () => this.checkAnswer(c.id, btn);
+                btn.innerHTML = `<span>${c.name}</span><i class="fas fa-question-circle opacity-20"></i>`;
+                btn.onclick = () => this.check(c.id, btn);
                 grid.appendChild(btn);
             });
 
@@ -293,142 +326,117 @@
 
         startTimer() {
             clearInterval(this.timer);
-            this.timeLeft = 100;
-            const bar = document.getElementById('timer-bar');
-            bar.style.width = '100%'; bar.style.background = '#ef4444';
-
+            let time = 100;
+            const fill = document.getElementById('timer-fill');
             this.timer = setInterval(() => {
-                this.timeLeft -= 1; // 10초
-                bar.style.width = this.timeLeft + '%';
-                if(this.timeLeft <= 0) {
-                    clearInterval(this.timer);
-                    this.checkAnswer('TIMEOUT', null);
-                }
+                time -= 1;
+                fill.style.width = time + '%';
+                if(time <= 0) { clearInterval(this.timer); this.check('TIMEOUT', null); }
             }, 100);
         },
 
-        checkAnswer(selectedId, btn) {
+        check(sid, btn) {
             if(this.isAnswered) return;
             this.isAnswered = true;
             clearInterval(this.timer);
 
-            document.querySelectorAll('.choice-btn').forEach(b => {
-                b.disabled = true;
-                if(b.innerText === this.currentQ.name) b.classList.add('correct');
-            });
+            const fb = document.getElementById('quiz-feedback');
+            fb.classList.remove('hidden-section');
+            document.getElementById('btn-next').classList.remove('hidden-section');
 
-            const fb = document.getElementById('feedback-alert');
-            fb.classList.remove('hidden-sec');
-
-            if(selectedId === this.currentQ.id) {
-                if(btn) btn.classList.add('correct');
-                fb.className = 'mt-4 p-4 rounded-xl font-bold text-center bg-green-100 text-green-800 border-green-300';
-                fb.innerHTML = `정답입니다! <div class="text-sm font-normal mt-1">${this.currentQ.tip}</div>`;
+            if(sid === this.currentQ.id) {
+                btn.classList.add('correct');
+                btn.querySelector('i').className = 'fas fa-check-circle';
+                fb.className = 'mt-4 p-5 rounded-3xl border-2 text-center bg-green-50 border-green-200 text-green-800 font-black';
+                fb.innerHTML = `정답! 🎉 <p class="text-xs font-bold mt-1 text-green-600">${this.currentQ.tip}</p>`;
             } else {
                 if(btn) btn.classList.add('wrong');
-                fb.className = 'mt-4 p-4 rounded-xl font-bold text-center bg-red-100 text-red-800 border-red-300';
-                fb.innerHTML = `오답! 정답은 <b>${this.currentQ.name}</b> <div class="text-sm font-normal mt-1">${this.currentQ.tip}</div>`;
+                fb.className = 'mt-4 p-5 rounded-3xl border-2 text-center bg-red-50 border-red-200 text-red-800 font-black';
+                fb.innerHTML = `오답.. 😢 정답은 [${this.currentQ.name}] <p class="text-xs font-bold mt-1 text-red-600">${this.currentQ.tip}</p>`;
                 
-                // 오답 로깅 (정답ID, 찍은오답ID)
-                this.wrongLogs.unshift({ correctId: this.currentQ.id, selectedId: selectedId, id: Date.now() });
-                if(this.wrongLogs.length > 20) this.wrongLogs.pop(); // 최근 20개만 저장
-                localStorage.setItem('climate_extreme_logs', JSON.stringify(this.wrongLogs));
+                // Log Wrong
+                this.history.unshift({ q: this.currentQ.id, s: sid, t: Date.now() });
+                if(this.history.length > 15) this.history.pop();
+                localStorage.setItem('climate_ultimate_history', JSON.stringify(this.history));
             }
-            document.getElementById('next-btn').classList.remove('hidden-sec');
+            this.updateMastery();
         },
 
-        nextQuiz() { this.qIdx++; this.loadQuestion(); },
+        nextQuestion() { this.currentIdx++; this.loadQuestion(); },
 
-        // --- 2. 무한 데스매치 ---
-        initDeathmatchSelectors() {
-            const s1 = document.getElementById('dm-sel-1');
-            const s2 = document.getElementById('dm-sel-2');
-            climateData.forEach(d => {
-                s1.add(new Option(d.name, d.id));
-                s2.add(new Option(d.name, d.id));
-            });
-            s1.value = 'Aw'; s2.value = 'Am'; // 기본값 세팅
-            this.renderDeathmatch();
+        updateMastery() {
+            // 간단하게 정답 비중 계산 (최근 20개 기준 등 복합 로직 생략)
+            const count = this.history.length;
+            const mastery = Math.max(0, 100 - (count * 6));
+            document.getElementById('mastery-label').innerText = `MASTERY ${mastery}%`;
+            document.getElementById('mastery-bar').style.width = mastery + '%';
         },
 
-        renderDeathmatch() {
-            const d1 = climateData.find(c => c.id === document.getElementById('dm-sel-1').value);
-            const d2 = climateData.find(c => c.id === document.getElementById('dm-sel-2').value);
+        // --- 무한 비교 ---
+        updateDM() {
+            const c1 = CLIMATES.find(c => c.id === document.getElementById('dm-1').value);
+            const c2 = CLIMATES.find(c => c.id === document.getElementById('dm-2').value);
+            
+            document.getElementById('dm-name-1').innerText = c1.name;
+            document.getElementById('dm-name-2').innerText = c2.name;
+            this.draw('dmChart1', c1, true);
+            this.draw('dmChart2', c2, true);
 
-            document.getElementById('dm-name-1').innerText = d1.name;
-            document.getElementById('dm-name-2').innerText = d2.name;
+            const m1 = document.getElementById('dm-matrix-1');
+            const m2 = document.getElementById('dm-matrix-2');
+            const makeChips = (c) => `<span class="matrix-chip chip-temp">연교차:${c.tr}</span><span class="matrix-chip chip-rain">패턴:${c.rt}</span>`;
+            m1.innerHTML = makeChips(c1);
+            m2.innerHTML = makeChips(c2);
 
-            this.draw('dmChart1', d1);
-            this.draw('dmChart2', d2);
-
-            let txt = `<b>[${d1.name}] 특징</b><br>${d1.tip}<br><br><b>[${d2.name}] 특징</b><br>${d2.tip}`;
-            if(d1.id === d2.id) txt = "같은 기후입니다.";
-            document.getElementById('dm-analysis').innerHTML = txt;
+            document.getElementById('dm-desc').innerHTML = `
+                <b>[${c1.name} vs ${c2.name} 판별 가이드]</b><br>
+                1. <b>기온</b>: ${c1.name}은 연교차가 '${c1.tr}'이고, ${c2.name}은 '${c2.tr}'입니다.<br>
+                2. <b>강수</b>: ${c1.name}은 '${c1.rt}' 패턴이며, ${c2.name}은 '${c2.rt}'입니다.<br>
+                3. <b>꿀팁</b>: ${c1.tip} / ${c2.tip}
+            `;
         },
 
-        // --- 3. 스마트 오답 노트 (양자 비교) ---
+        // --- 오답 분석 ---
         renderStats() {
-            const list = document.getElementById('wrong-list');
-            list.innerHTML = '';
-
-            if(this.wrongLogs.length === 0) {
-                list.innerHTML = '<div class="text-center py-10 text-slate-400">저장된 오답이 없습니다.</div>';
+            const container = document.getElementById('wrong-container');
+            container.innerHTML = '';
+            if(this.history.length === 0) {
+                container.innerHTML = '<div class="py-20 text-center text-slate-400 font-bold">오답 기록이 없습니다. 완벽해요!</div>';
                 return;
             }
 
-            // 고유 ID 생성을 위해 index 사용
-            this.wrongLogs.forEach((log, index) => {
-                const correct = climateData.find(c => c.id === log.correctId);
-                const wrong = log.selectedId === 'TIMEOUT' ? null : climateData.find(c => c.id === log.selectedId);
-                
-                const canvasId1 = `stats-c-${index}`;
-                const canvasId2 = `stats-w-${index}`;
-
-                let html = `
-                    <div class="p-4 bg-slate-50 border border-slate-200 rounded-2xl">
-                        <div class="flex justify-between items-center mb-3">
-                            <span class="text-sm font-bold text-red-500">실제 정답: ${correct.name}</span>
-                            <span class="text-sm font-bold text-slate-500">내가 고른 답: ${wrong ? wrong.name : '시간초과'}</span>
+            this.history.forEach((item, i) => {
+                const q = CLIMATES.find(c => c.id === item.q);
+                const s = CLIMATES.find(c => c.id === item.s);
+                const row = document.createElement('div');
+                row.className = 'glass-card p-4 border-l-8 border-l-red-500 shadow-sm';
+                row.innerHTML = `
+                    <div class="flex justify-between items-center mb-4">
+                        <span class="text-xs font-black text-slate-400">최근 오답 분석 #${i+1}</span>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="relative">
+                            <div class="text-[10px] font-black text-blue-600 mb-1">✅ 정답: ${q.name}</div>
+                            <div class="stat-chart-container"><canvas id="wrong-q-${i}"></canvas></div>
+                            <div class="mt-2 text-[10px] text-slate-500">${q.tip}</div>
                         </div>
-                        <div class="grid-2col">
-                            <div>
-                                <div class="compare-chart"><canvas id="${canvasId1}"></canvas></div>
-                                <p class="text-xs text-center mt-1 text-slate-500">${correct.tip}</p>
-                            </div>
+                        <div class="relative ${!s ? 'hidden' : ''}">
+                            <div class="text-[10px] font-black text-red-500 mb-1">❌ 선택: ${s ? s.name : ''}</div>
+                            <div class="stat-chart-container"><canvas id="wrong-s-${i}"></canvas></div>
+                            <div class="mt-2 text-[10px] text-slate-500">${s ? s.tip : ''}</div>
+                        </div>
+                    </div>
                 `;
-                
-                if(wrong) {
-                    html += `
-                            <div>
-                                <div class="compare-chart"><canvas id="${canvasId2}"></canvas></div>
-                                <p class="text-xs text-center mt-1 text-slate-500">${wrong.tip}</p>
-                            </div>
-                    `;
-                } else {
-                    html += `<div class="flex items-center justify-center text-slate-400 text-sm">시간이 부족했습니다.</div>`;
-                }
-
-                html += `</div></div>`;
-                list.innerHTML += html;
-
-                // DOM 추가 후 차트 렌더링 지연 실행
+                container.appendChild(row);
                 setTimeout(() => {
-                    this.draw(canvasId1, correct, true);
-                    if(wrong) this.draw(canvasId2, wrong, true);
-                }, 50);
+                    this.draw(`wrong-q-${i}`, q, true);
+                    if(s) this.draw(`wrong-s-${i}`, s, true);
+                }, 100);
             });
-        },
-
-        resetStats() {
-            if(confirm('오답 노트를 싹 지울까요?')) {
-                this.wrongLogs = [];
-                localStorage.removeItem('climate_extreme_logs');
-                this.renderStats();
-            }
         }
     };
 
-    window.onload = () => app.init();
+    window.onload = () => game.init();
 </script>
 </body>
 </html>
