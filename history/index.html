@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>한국사 마스터 타임라인</title>
+    <style>
+        /* One UI 8.5 & iOS 9 호환성 스타일 */
+        * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+            background-color: #f2f2f7;
+            color: #1c1c1e;
+            line-height: 1.5;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* 플로팅 바 (상단 네비게이션) */
+        #top-nav {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 1000;
+            padding-top: 20px;
+            text-align: center;
+            pointer-events: none;
+            -webkit-transition: all 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+            transition: all 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+        }
+        #bar-content {
+            display: inline-block;
+            background: rgba(255, 255, 255, 0.8);
+            -webkit-backdrop-filter: blur(20px);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.5);
+            border-radius: 40px;
+            padding: 6px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.05);
+            pointer-events: auto;
+            -webkit-transform-origin: top center;
+            transform-origin: top center;
+            -webkit-transition: all 0.4s ease;
+            transition: all 0.4s ease;
+        }
+        #top-nav.compact { padding-top: 10px; }
+        #top-nav.compact #bar-content { -webkit-transform: scale(0.9); transform: scale(0.9); box-shadow: 0 8px 30px rgba(0,0,0,0.1); }
+
+        .filter-btn {
+            background: none;
+            border: none;
+            padding: 8px 14px;
+            font-size: 14px;
+            font-weight: 600;
+            color: #8e8e93;
+            cursor: pointer;
+            border-radius: 20px;
+            -webkit-transition: 0.3s;
+            transition: 0.3s;
+        }
+        .filter-btn.active { background-color: #007aff; color: #fff; }
+
+        /* 헤더 */
+        .header { padding: 100px 20px 30px; text-align: center; }
+        .header h1 { font-size: 32px; font-weight: 800; margin-bottom: 5px; }
+        .header p { font-size: 15px; color: #8e8e93; }
+
+        /* 타임라인 레이아웃 */
+        .timeline-container {
+            max-width: 600px;
+            margin: 0 auto;
+            position: relative;
+            padding: 20px;
+        }
+        .timeline-line {
+            position: absolute;
+            left: 35px;
+            top: 0;
+            bottom: 0;
+            width: 2px;
+            background: #e5e5ea;
+            z-index: 1;
+        }
+
+        /* 카드 아이템 */
+        .item {
+            position: relative;
+            margin-bottom: 16px;
+            padding-left: 50px;
+            z-index: 2;
+            cursor: pointer;
+            -webkit-animation: slideUp 0.5s ease-out forwards;
+            animation: slideUp 0.5s ease-out forwards;
+            opacity: 0;
+        }
+        @-webkit-keyframes slideUp { from { opacity:0; -webkit-transform:translateY(20px); } to { opacity:1; -webkit-transform:translateY(0); } }
+        @keyframes slideUp { from { opacity:0; transform:translateY(20px); } to { opacity:1; transform:translateY(0); } }
+
+        .dot {
+            position: absolute;
+            left: 7px;
+            top: 22px;
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background: #007aff;
+            border: 3px solid #f2f2f7;
+            z-index: 3;
+        }
+
+        .card {
+            background: #fff;
+            border-radius: 24px;
+            padding: 18px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.02);
+            -webkit-transition: 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+            transition: 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+            border: 1px solid rgba(0,0,0,0.03);
+        }
+        .item:active .card { -webkit-transform: scale(0.97); transform: scale(0.97); }
+
+        .year { font-size: 11px; font-weight: 700; margin-bottom: 2px; }
+        .title { font-size: 17px; font-weight: 700; color: #000; display: block; }
+        .summary { font-size: 13px; color: #8e8e93; margin-top: 2px; }
+
+        .details {
+            max-height: 0;
+            opacity: 0;
+            overflow: hidden;
+            -webkit-transition: all 0.4s ease;
+            transition: all 0.4s ease;
+        }
+        .item.open .details { max-height: 1000px; opacity: 1; margin-top: 15px; padding-top: 15px; border-top: 1px solid #f2f2f7; }
+        
+        .details ul { list-style: none; }
+        .details li { font-size: 14px; margin-bottom: 8px; color: #3a3a3c; position: relative; padding-left: 15px; }
+        .details li::before { content: "•"; position: absolute; left: 0; color: #007aff; }
+        .tag { display: inline-block; padding: 2px 8px; border-radius: 6px; font-size: 10px; font-weight: 800; color: #fff; margin-right: 5px; vertical-align: middle; }
+
+        /* 시대별 컬러 */
+        .color-ancient { background-color: #5856d6; } /* 고대: 보라 */
+        .color-goryeo { background-color: #34c759; }  /* 고려: 녹색 */
+        .color-joseon { background-color: #ff9500; }  /* 조선: 주황 */
+        .text-ancient { color: #5856d6; }
+        .text-goryeo { color: #34c759; }
+        .text-joseon { color: #ff9500; }
+    </style>
+</head>
+<body>
+
+<nav id="top-nav">
+    <div id="bar-content">
+        <button class="filter-btn active" onclick="filterData('all', this)">전체</button>
+        <button class="filter-btn" onclick="filterData('ancient', this)">선사·고대</button>
+        <button class="filter-btn" onclick="filterData('goryeo', this)">고려</button>
+        <button class="filter-btn" onclick="filterData('joseon', this)">조선</button>
+    </div>
+</nav>
+
+<header class="header">
+    <h1>한국사 타임라인</h1>
+    <p>50개 핵심 항목으로 정리한 역사의 흐름</p>
+</header>
+
+<div class="timeline-container">
+    <div class="timeline-line"></div>
+    <div id="list-target"></div>
+</div>
+
+<script>
+    // 50개 이상의 데이터 항목 (iOS 9 호환을 위해 var 사용)
+    var data = [
+        // --- 고대 (Ancient) ---
+        {cat:'ancient', year:'약 70만년 전', title:'구석기 시대', sub:'뗀석기와 이동 생활', detail:['주먹도끼 등 뗀석기 사용','동굴이나 막집 거주, 채집과 사냥','무리 지어 이동 생활']},
+        {cat:'ancient', year:'기원전 8000년', title:'신석기 시대', sub:'간석기와 농경의 시작', detail:['비살무늬 토기 사용','가락바퀴와 뼈바늘로 옷 제작','정착 생활과 씨족 사회']},
+        {cat:'ancient', year:'기원전 2333년', title:'고조선 건국', sub:'단군왕검과 8조법', detail:['비파형 동검과 고인돌 문화 기반','제정일치 사회','8조법(생명 존중, 사유 재산)']},
+        {cat:'ancient', year:'기원전 2세기', title:'위만 조선', sub:'철기 문화의 본격 수용', detail:['위만이 준왕을 몰아내고 집권','철기 문화 보급 및 중계 무역 발달']},
+        {cat:'ancient', year:'1세기 전후', title:'부여·고구려·옥저·동예·삼한', sub:'연맹 왕국의 성장', detail:['부여: 영고, 사출도','고구려: 동맹, 서옥제','옥저: 민며느리제','동예: 무천, 책화','삼한: 소도(천군)']},
+        {cat:'ancient', year:'2~4세기', title:'삼국의 기틀 마련', sub:'고구려·백제·신라의 성장', detail:['고구려 고국천왕: 진대법 실시','백제 고이왕: 관등제 정비','신라 내물왕: 김씨 세습']},
+        {cat:'ancient', year:'4세기', title:'백제의 전성기 (근초고왕)', sub:'요서 진출과 마한 정복', detail:['부자 상속 확립','중국 동진, 왜와 교류','마한 전 지역 통합']},
+        {cat:'ancient', year:'4세기 말', title:'고구려의 체제 정비 (소수림왕)', sub:'불교, 태학, 율령', detail:['불교 수용으로 사상 통합','태학 설립으로 인재 양성','율령 반포로 국가 질서 확립']},
+        {cat:'ancient', year:'5세기', title:'고구려의 전성기 (광개토·장수왕)', sub:'영토 확장과 평양 천도', detail:['광개토대왕: 만주 정벌, 신라 구원','장수왕: 남진 정책, 한강 유역 장악','중원 고구려비 건립']},
+        {cat:'ancient', year:'6세기', title:'신라의 전성기 (지증·법흥·진흥왕)', sub:'한강 유역 차지와 삼국 통일 기반', detail:['지증왕: 국호 신라, 왕 칭호 사용','법흥왕: 금관가야 병합, 율령 반포','진흥왕: 화랑도 개편, 한강 점령, 대가야 병합']},
+        {cat:'ancient', year:'612년', title:'살수 대첩', sub:'고구려의 대수 항쟁', detail:['을지문덕의 수나라 군대 격파','천리장성 축조로 당 방어']},
+        {cat:'ancient', year:'645년', title:'안시성 전투', sub:'당 태종의 침입 격퇴', detail:['양만춘(추정)과 군민의 항전','당의 야욕을 저지함']},
+        {cat:'ancient', year:'660년', title:'백제 멸망', sub:'나당 연합군의 침공', detail:['계백의 황산벌 전투','사비성 함락']},
+        {cat:'ancient', year:'668년', title:'고구려 멸망', sub:'연개소문 사후 내분', detail:['평양성 함락','부흥 운동 전개 (안승, 검모잠)']},
+        {cat:'ancient', year:'676년', title:'신라의 삼국 통일', sub:'매소성·기벌포 전투 승리', detail:['당의 한반도 지배 야욕 저지','대동강에서 원산만까지의 통일']},
+        {cat:'ancient', year:'698년', title:'발해 건국', sub:'대조영의 동모산 건국', detail:['고구려 계승 표방','3성 6부 체제','무왕(영토), 문왕(체제), 선왕(해동성국)']},
+        {cat:'ancient', year:'7세기 말', title:'신문왕의 개혁', sub:'왕권 전제화와 제도 정비', detail:['국학 설립','관료전 지급, 녹읍 폐지','9주 5소경 체제']},
+        {cat:'ancient', year:'9세기', title:'장보고의 청해진', sub:'해상 무역의 장악', detail:['완도에 청해진 설치','한·중·일 해상 교역 주도']},
+
+        // --- 고려 (Goryeo) ---
+        {cat:'goryeo', year:'918년', title:'고려 건국', sub:'태조 왕건의 즉위', detail:['궁예를 몰아내고 개경 건국','고구려 계승 의지(국호 고려)']},
+        {cat:'goryeo', year:'936년', title:'후삼국 통일', sub:'신라 항복 및 후백제 멸망', detail:['견훤 투항 수용','일리천 전투 승리로 통일']},
+        {cat:'goryeo', year:'10세기', title:'태조의 정책', sub:'민생 안정과 호족 포용', detail:['취민유도(세금 감면)','훈요 10조 작성','북진 정책(서경 중시)']},
+        {cat:'goryeo', year:'10세기 중반', title:'광종의 개혁', sub:'왕권 강화의 기틀', detail:['노비안검법(호족 기반 약화)','과거제 실시(관리 선발 지표)','공복 제정']},
+        {cat:'goryeo', year:'10세기 후반', title:'성종의 정비', sub:'유교 통치 체제 확립', detail:['최승로의 시무 28조 수용','2성 6부제 정립','12목 지방관 파견']},
+        {cat:'goryeo', year:'11세기', title:'거란의 침입과 격퇴', sub:'강동 6주와 귀주 대첩', detail:['서희의 외교 담판(강동 6주)','강감찬의 귀주 대첩']},
+        {cat:'goryeo', year:'12세기 초', title:'윤관의 동북 9성', sub:'여진 정벌과 별무반', detail:['신기군, 신보군, 항마군 구성','여진족을 몰아내고 9성 축조']},
+        {cat:'goryeo', year:'1126년', title:'이자겸의 난', sub:'문벌 귀족 사회의 동요', detail:['외척 세력의 권력 독점','중앙 귀족의 내분 표출']},
+        {cat:'goryeo', year:'1135년', title:'묘청의 서경 천도 운동', sub:'자주 의식과 풍수지리설', detail:['서경 천도 및 칭제건원 주장','김부식 중심의 관군에 진압']},
+        {cat:'goryeo', year:'1170년', title:'무신 정변', sub:'무신들의 집권', detail:['의종 폐위, 문신 숙청','정중부에서 최충헌(교정도감)으로']},
+        {cat:'goryeo', year:'1231년', title:'몽골의 침입', sub:'강화 천도와 항전', detail:['40여 년간의 강화도 항전','팔만대장경 조판','삼별초의 저항']},
+        {cat:'goryeo', year:'14세기 중반', title:'공민왕의 개혁', sub:'반원 자주 정책', detail:['친원 세력(기철) 숙청','쌍성총관부 공격 및 수복','전민변정도감(신돈 등용)']},
+
+        // --- 조선 (Joseon) ---
+        {cat:'joseon', year:'1388년', title:'위화도 회군', sub:'이성계의 권력 장악', detail:['요동 정벌 반대','회군 후 정치·군사적 실권 장악']},
+        {cat:'joseon', year:'1391년', title:'과전법 실시', sub:'경제적 기반 마련', detail:['신진 사대부의 경제 기반 확보','기존 수조권 제도 개혁']},
+        {cat:'joseon', year:'1392년', title:'조선 건국', sub:'한양 천도와 성리학 국가', detail:['이성계 즉위','정도전의 주도로 국가 기틀 마련']},
+        {cat:'joseon', year:'15세기 초', title:'태종의 왕권 강화', sub:'사병 혁파와 호패법', detail:['6조 직계제 실시','사간원 독립','호패법으로 인구 파악']},
+        {cat:'joseon', year:'15세기 중반', title:'세종의 황금기', sub:'민족 문화의 융성', detail:['집현전 설치, 의정부 서사제','훈민정음 창제','4군 6진 개척']},
+        {cat:'joseon', year:'15세기 후반', title:'성종의 완성', sub:'경국대전 반포', detail:['조선의 법전 완성','홍문관 설치로 유교 정치 강화']},
+        {cat:'joseon', year:'1498~1545년', title:'4대 사화', sub:'훈구와 사림의 대립', detail:['무오, 갑자, 기묘, 을사사화','조광조의 개혁(기묘사화) 좌절']},
+        {cat:'joseon', year:'16세기 중반', title:'붕당 정치의 시작', sub:'동인과 서인의 분화', detail:['이조 전랑 자리를 둘러싼 갈등','서원과 향약을 배경으로 성장']},
+        {cat:'joseon', year:'1592년', title:'임진왜란', sub:'이순신과 의병의 활약', detail:['일본의 침략','한산도 대첩, 명량 대첩','비변사 기능 강화']},
+        {cat:'joseon', year:'1608년', title:'대동법 실시 (광해군)', sub:'공납의 전세화', detail:['특산물 대신 쌀·포·전 납부','공인의 등장으로 상품 경제 발달']},
+        {cat:'joseon', year:'1623년', title:'인조반정', sub:'친명배금 정책으로 선회', detail:['광해군의 중립 외교 비판','서인 세력의 집권']},
+        {cat:'joseon', year:'1636년', title:'병자호란', sub:'남한산성의 항전', detail:['청의 침입','삼전도의 굴욕','북벌론 대두']},
+        {cat:'joseon', year:'17세기 말', title:'환국 정치', sub:'붕당 간의 급격한 정권 교체', detail:['경신, 기사, 갑술환국','일당 전제화 현상 초래']},
+        {cat:'joseon', year:'18세기 초', title:'영조의 탕평책', sub:'붕당 갈등 완화 시도', detail:['완론 탕평','균역법(군포 1필로 감면)','서원 정리']},
+        {cat:'joseon', year:'18세기 후반', title:'정조의 개혁', sub:'수원 화성과 장용영', detail:['준론 탕평','규장각 설치','초계문신제 실시']},
+        {cat:'joseon', year:'19세기 전반', title:'세도 정치', sub:'외척 세력의 권력 독점', detail:['안동 김씨, 풍양 조씨의 세도','매관매직과 삼정의 문란']},
+        {cat:'joseon', year:'1811/1862년', title:'농민 봉기', sub:'홍경래의 난과 임술 농민 봉기', detail:['세도 정치와 삼정 문란에 저항','지방 관리들의 착취 비판']},
+        {cat:'joseon', year:'1860년', title:'동학 창시', sub:'최제우의 민족 종교', detail:['인내천 사상(평등)','서학에 대항한 동학']},
+        {cat:'joseon', year:'1863년', title:'흥선대원군 집권', sub:'왕권 강화와 쇄국', detail:['서원 철폐, 호포제 실시','비변사 폐지','척화비 건립']}
+    ];
+
+    // 필터링 및 렌더링 (ES5)
+    function render(filter) {
+        var target = document.getElementById('list-target');
+        var html = '';
+        var filtered = data;
+        
+        if (filter !== 'all') {
+            filtered = [];
+            for (var i=0; i<data.length; i++) {
+                if (data[i].cat === filter) filtered.push(data[i]);
+            }
+        }
+
+        for (var j=0; j<filtered.length; j++) {
+            var item = filtered[j];
+            var colorClass = 'color-' + item.cat;
+            var textClass = 'text-' + item.cat;
+            var catName = (item.cat === 'ancient' ? '선사·고대' : (item.cat === 'goryeo' ? '고려' : '조선'));
+
+            html += '<div class="item" onclick="this.className=(this.className==\'item\'?\'item open\':\'item\')">';
+            html += '  <div class="dot ' + colorClass + '"></div>';
+            html += '  <div class="card">';
+            html += '    <div class="year ' + textClass + '">' + item.year + '</div>';
+            html += '    <div class="title"><span class="tag ' + colorClass + '">' + catName + '</span>' + item.title + '</div>';
+            html += '    <div class="summary">' + item.sub + '</div>';
+            html += '    <div class="details"><ul>';
+            for (var k=0; k<item.detail.length; k++) {
+                html += '      <li>' + item.detail[k] + '</li>';
+            }
+            html += '    </ul></div>';
+            html += '  </div>';
+            html += '</div>';
+        }
+        target.innerHTML = html;
+    }
+
+    function filterData(cat, btn) {
+        var btns = document.getElementsByClassName('filter-btn');
+        for (var i=0; i<btns.length; i++) btns[i].className = 'filter-btn';
+        btn.className = 'filter-btn active';
+        render(cat);
+        window.scrollTo(0,0);
+    }
+
+    // 스크롤 이벤트
+    window.onscroll = function() {
+        var nav = document.getElementById('top-nav');
+        var top = window.pageYOffset || document.documentElement.scrollTop;
+        if (top > 40) nav.className = 'compact';
+        else nav.className = '';
+    };
+
+    // 초기 실행
+    window.onload = function() { render('all'); };
+</script>
+
+</body>
+</html>
