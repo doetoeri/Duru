@@ -1,0 +1,263 @@
+
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>기후 마스터 - D-4 주관식</title>
+    <style>
+        /* Base Styling - iOS 9 Compatible */
+        * { -webkit-box-sizing: border-box; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        body { 
+            font-family: -apple-system, "Helvetica Neue", "Apple SD Gothic Neo", sans-serif; 
+            background-color: #f4f7f9; color: #334155; margin: 0; padding: 0; 
+        }
+        .container { max-width: 500px; margin: 0 auto; padding: 15px; padding-bottom: 100px; }
+
+        /* Floating Nav */
+        .nav {
+            position: fixed; bottom: 20px; left: 50%; width: 90%; height: 60px;
+            margin-left: -45%; background: #ffffff; border-radius: 30px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1); display: -webkit-flex; display: flex;
+            z-index: 1000; border: 1px solid #e2e8f0; transition: all 0.3s;
+        }
+        .nav.shrunk { height: 45px; bottom: 10px; width: 70%; margin-left: -35%; }
+        .nav-item {
+            -webkit-flex: 1; flex: 1; display: -webkit-flex; display: flex;
+            -webkit-flex-direction: column; flex-direction: column;
+            -webkit-align-items: center; align-items: center;
+            -webkit-justify-content: center; justify-content: center;
+            color: #94a3b8; font-size: 10px; font-weight: bold; text-decoration: none;
+        }
+        .nav-item.active { color: #2563eb; }
+        .nav-item svg { width: 20px; height: 20px; fill: currentColor; }
+        .shrunk .nav-item span { display: none; }
+
+        /* Card & Graph */
+        .card { background: #fff; border-radius: 20px; padding: 15px; margin-bottom: 15px; border: 1px solid #e2e8f0; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+        .graph-area { width: 100%; height: 220px; background: #fff; position: relative; margin-top: 10px; }
+        .axis-label { font-size: 9px; fill: #64748b; font-weight: bold; }
+        
+        /* Input & Feedback */
+        .input-wrap { margin-top: 15px; }
+        .q-input { 
+            width: 100%; padding: 15px; border-radius: 15px; border: 2px solid #cbd5e1; 
+            font-size: 16px; font-weight: bold; outline: none; -webkit-appearance: none;
+        }
+        .q-input:focus { border-color: #2563eb; }
+        .submit-btn {
+            width: 100%; padding: 15px; background: #2563eb; color: #fff; 
+            border: none; border-radius: 15px; font-size: 16px; font-weight: bold; margin-top: 10px;
+        }
+        .feedback { padding: 15px; border-radius: 15px; text-align: center; font-weight: bold; margin-top: 10px; display: none; }
+        .correct { background: #dcfce7; color: #166534; border: 1px solid #22c55e; }
+        .wrong { background: #fee2e2; color: #991b1b; border: 1px solid #ef4444; }
+
+        /* Badges */
+        .badge { padding: 3px 7px; border-radius: 5px; font-size: 10px; font-weight: 800; margin-right: 4px; display: inline-block; }
+        .b-temp { background: #fee2e2; color: #ef4444; }
+        .b-rain { background: #e0f2fe; color: #0284c7; }
+        
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header style="display: -webkit-flex; display: flex; -webkit-justify-content: space-between; justify-content: space-between; margin-bottom: 15px;">
+        <h1 style="font-size: 20px; margin: 0;">Climate <span style="color:#2563eb;">Final D-4</span></h1>
+        <div id="mastery-txt" style="font-size: 11px; font-weight: 900; color: #3b82f6;">MASTERY 0%</div>
+    </header>
+
+    <!-- Quiz View -->
+    <div id="view-quiz">
+        <div class="card">
+            <div id="quiz-badges" style="margin-bottom: 8px;"></div>
+            <div id="quiz-graph" class="graph-area"></div>
+        </div>
+
+        <div class="input-wrap" id="quiz-action-area">
+            <input type="text" id="user-answer" class="q-input" placeholder="기후 명칭을 입력하세요..." autocomplete="off">
+            <button class="submit-btn" onclick="app.check()">정답 확인</button>
+        </div>
+
+        <div id="quiz-feedback" class="feedback"></div>
+        <button id="quiz-next" class="submit-btn hidden" style="background: #1e293b;" onclick="app.next()">다음 문제</button>
+    </div>
+
+    <!-- Deathmatch & Stats (Simplified for Offline/Legacy) -->
+    <div id="view-dm" class="hidden">
+        <div class="card">
+            <h3 style="margin-top: 0;">기후 비교 분석</h3>
+            <div id="dm-list" style="font-size: 13px; line-height: 1.6;"></div>
+        </div>
+    </div>
+</div>
+
+<nav id="main-nav" class="nav">
+    <a href="javascript:void(0)" class="nav-item active" onclick="app.tab('quiz', this)">
+        <svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
+        <span>주관식</span>
+    </a>
+    <a href="javascript:void(0)" class="nav-item" onclick="app.tab('dm', this)">
+        <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
+        <span>분석</span>
+    </a>
+</nav>
+
+<script>
+    // --- Data (Legacy JS) ---
+    // 온난습윤 제외, 냉대 기후 통합
+    var CLIMATES = [
+        { id: 'Af', names: ['열대우림', '열대우림기후', 'Af'], tr: '소', rt: '연중습윤', temp: [26,27,27,26,27,26,26,27,27,27,26,26], rain: [250,230,280,260,240,210,200,220,240,250,260,270], tip: '최한월 18도 이상, 모든 달 60mm↑.' },
+        { id: 'Am', names: ['열대몬순', '열대몬순기후', 'Am'], tr: '소', rt: '우건기뚜렷', temp: [25,26,28,29,28,27,26,26,27,27,26,25], rain: [10,20,50,150,400,600,750,650,400,200,80,20], tip: '여름 강수 압도적, 짧은 건기.' },
+        { id: 'Aw', names: ['사바나', '사바나기후', 'Aw'], tr: '소', rt: '우건기뚜렷', temp: [24,25,27,28,27,25,24,24,25,26,25,24], rain: [5,5,20,80,200,250,300,280,180,60,10,5], tip: '겨울 건기 매우 뚜렷.' },
+        { id: 'BS', names: ['스텝', '스텝기후', 'BS'], tr: '중', rt: '연중건조', temp: [15,18,22,26,30,32,33,32,30,25,20,16], rain: [30,35,40,45,50,20,10,15,25,40,35,30], tip: '연강수 250~500mm.' },
+        { id: 'BW', names: ['사막', '사막기후', 'BW'], tr: '중', rt: '연중건조', temp: [12,15,20,25,30,34,36,35,31,25,18,13], rain: [10,12,8,5,2,0,0,1,3,7,12,10], tip: '연강수 250mm 미만.' },
+        { id: 'Cfb',names: ['서안해양성', '서안해양성기후', 'Cfb'], tr: '중', rt: '연중습윤', temp: [5,6,9,12,15,18,20,20,17,13,8,6], rain: [80,70,75,70,75,80,85,90,85,95,90,95], tip: '여름 서늘(22도↓) 연중 고른 강수.' },
+        { id: 'Cs', names: ['지중해성', '지중해성기후', 'Cs'], tr: '중', rt: '우건기뚜렷', temp: [10,11,13,16,20,24,27,27,24,19,14,11], rain: [120,100,80,50,20,5,2,5,25,60,100,130], tip: '여름 고온건조. 강수 V자형.' },
+        { id: 'Cw', names: ['온대겨울건조', '온대동계건조', 'Cw'], tr: '대', rt: '우건기뚜렷', temp: [12,14,18,22,26,28,29,28,26,22,18,14], rain: [10,15,30,80,180,250,350,320,200,60,20,10], tip: '여름 집중 강수, 겨울 건조.' },
+        { id: 'D',  names: ['냉대', '냉대기후', 'D'], tr: '대', rt: '유동적', temp: [-15,-10,0,10,18,22,25,24,18,8,-5,-12], rain: [30,35,45,60,80,120,180,160,80,50,40,30], tip: '최한월 -3도 미만, 최난월 10도 이상.' },
+        { id: 'ET', names: ['툰드라', '툰드라기후', 'ET'], tr: '대', rt: '연중건조', temp: [-25,-23,-18,-10,-2,4,8,7,1,-8,-16,-22], rain: [10,10,15,15,20,30,40,45,35,25,20,15], tip: '최난월 0~10도.' },
+        { id: 'EF', names: ['빙설', '빙설기후', 'EF'], tr: '대', rt: '연중건조', temp: [-40,-38,-35,-30,-25,-22,-20,-21,-26,-32,-37,-40], rain: [5,5,3,2,2,1,1,1,2,3,5,5], tip: '모든 달 0도 미만.' },
+        { id: 'H',  names: ['고산', '고산기후', 'H'], tr: '소', rt: '연중습윤', temp: [13,13,14,14,14,14,13,13,14,14,14,13], rain: [50,60,80,120,150,100,80,70,130,140,90,60], tip: '상춘 기후.' }
+    ];
+
+    var app = {
+        score: 0,
+        total: 0,
+        currentQ: null,
+        history: [],
+
+        init: function() {
+            var self = this;
+            window.onscroll = function() {
+                var nav = document.getElementById('main-nav');
+                if (window.pageYOffset > 50) nav.className = 'nav shrunk';
+                else nav.className = 'nav';
+            };
+            this.loadNext();
+        },
+
+        tab: function(id, el) {
+            document.getElementById('view-quiz').className = 'hidden';
+            document.getElementById('view-dm').className = 'hidden';
+            document.getElementById('view-' + id).className = '';
+            var items = document.getElementsByClassName('nav-item');
+            for(var i=0; i<items.length; i++) items[i].className = 'nav-item';
+            el.className = 'nav-item active';
+            if(id === 'dm') this.renderDM();
+        },
+
+        // SVG Graph (Fixed Axis Labels)
+        createGraph: function(containerId, data) {
+            var container = document.getElementById(containerId);
+            var w = container.offsetWidth;
+            var h = container.offsetHeight;
+            var padL = 35; // Left padding for Y axis
+            var padB = 30; // Bottom padding for X axis
+            var padT = 10;
+            var padR = 30;
+
+            var svg = '<svg width="100%" height="100%" viewBox="0 0 '+w+' '+h+'">';
+            
+            // Y-Axis Ticks (Temperature -50 to 40)
+            var temps = [-40, -20, 0, 20, 40];
+            for(var i=0; i<temps.length; i++) {
+                var ty = h - padB - ((temps[i] - (-50)) / 90 * (h - padB - padT));
+                svg += '<line x1="'+padL+'" y1="'+ty+'" x2="'+(w-padR)+'" y2="'+ty+'" stroke="#f1f5f9" />';
+                svg += '<text x="'+(padL-5)+'" y="'+(ty+4)+'" class="axis-label" text-anchor="end">'+temps[i]+'</text>';
+            }
+
+            // X-Axis Ticks (Months 1-12)
+            var bw = (w - padL - padR) / 12;
+            for(var i=0; i<12; i++) {
+                var tx = padL + (i * bw) + (bw/2);
+                svg += '<text x="'+tx+'" y="'+(h-10)+'" class="axis-label" text-anchor="middle">'+(i+1)+'</text>';
+            }
+
+            // Bars (Rainfall max 800)
+            for(var i=0; i<12; i++) {
+                var rh = (data.rain[i] / 800) * (h - padB - padT);
+                var rx = padL + (i * bw) + 2;
+                var ry = h - padB - rh;
+                svg += '<rect x="'+rx+'" y="'+ry+'" width="'+(bw-4)+'" height="'+rh+'" fill="#bfdbfe" />';
+            }
+
+            // Line (Temperature)
+            var points = "";
+            for(var i=0; i<12; i++) {
+                var lx = padL + (i * bw) + (bw/2);
+                var ly = h - padB - ((data.temp[i] - (-50)) / 90 * (h - padB - padT));
+                points += lx + "," + ly + " ";
+                svg += '<circle cx="'+lx+'" cy="'+ly+'" r="2.5" fill="#ef4444" />';
+            }
+            svg += '<polyline points="'+points+'" fill="none" stroke="#ef4444" stroke-width="2.5" />';
+            
+            svg += '</svg>';
+            container.innerHTML = svg;
+        },
+
+        loadNext: function() {
+            this.currentQ = CLIMATES[Math.floor(Math.random() * CLIMATES.length)];
+            document.getElementById('user-answer').value = "";
+            document.getElementById('quiz-feedback').style.display = "none";
+            document.getElementById('quiz-next').className = "submit-btn hidden";
+            document.getElementById('quiz-action-area').className = "input-wrap";
+            
+            document.getElementById('quiz-badges').innerHTML = 
+                '<span class="badge b-temp">연교차: '+this.currentQ.tr+'</span>' +
+                '<span class="badge b-rain">패턴: '+this.currentQ.rt+'</span>';
+            
+            this.createGraph('quiz-graph', this.currentQ);
+        },
+
+        // 유도리 채점 로직 (문자열 유사도 및 포함 여부)
+        check: function() {
+            var rawInput = document.getElementById('user-answer').value.replace(/\s/g, '').toLowerCase();
+            if(!rawInput) return;
+
+            var isCorrect = false;
+            for(var i=0; i<this.currentQ.names.length; i++) {
+                var target = this.currentQ.names[i].replace(/\s/g, '').toLowerCase();
+                // 1. 완전 일치 또는 2. 입력값이 정답에 포함되거나 그 반대 (단, 2글자 이상일 때만)
+                if(rawInput === target || (rawInput.length >= 2 && (target.indexOf(rawInput) !== -1 || rawInput.indexOf(target) !== -1))) {
+                    isCorrect = true;
+                    break;
+                }
+            }
+
+            this.total++;
+            if(isCorrect) this.score++;
+            
+            var fb = document.getElementById('quiz-feedback');
+            fb.style.display = "block";
+            fb.className = "feedback " + (isCorrect ? "correct" : "wrong");
+            fb.innerHTML = (isCorrect ? "정답입니다! 🎉" : "아쉬워요! 정답은 [" + this.currentQ.names[0] + "]") + "<br><small style='font-weight:normal;'>" + this.currentQ.tip + "</small>";
+            
+            document.getElementById('quiz-next').className = "submit-btn";
+            document.getElementById('quiz-action-area').className = "input-wrap hidden";
+            
+            var mastery = Math.round((this.score / this.total) * 100);
+            document.getElementById('mastery-txt').innerText = "MASTERY " + mastery + "%";
+        },
+
+        next: function() { this.loadNext(); },
+
+        renderDM: function() {
+            var dm = document.getElementById('dm-list');
+            var html = "";
+            for(var i=0; i<CLIMATES.length; i++) {
+                var c = CLIMATES[i];
+                html += "<div style='margin-bottom:10px; padding-bottom:5px; border-bottom:1px solid #f1f5f9;'>";
+                html += "<b>" + c.names[0] + "</b>: " + c.tip + " (연교차: " + c.tr + ")";
+                html += "</div>";
+            }
+            dm.innerHTML = html;
+        }
+    };
+
+    window.onload = function() { app.init(); };
+</script>
+</body>
+</html>
