@@ -64,25 +64,25 @@ export default function Schedule() {
       <div className="max-w-4xl mx-auto">
         {/* Header */}
         <div className="mb-12 animate-fade-in-up">
-          <Link href="/" className="inline-flex items-center text-gray-400 hover:text-white transition-colors mb-6">
+          <Link href="/" className="inline-flex items-center text-gray-600 hover:text-gray-900 transition-colors mb-6">
             <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 12H5M12 19l-7-7 7-7" />
             </svg>
             <span className="text-sm font-light">돌아가기</span>
           </Link>
-          <h1 className="text-4xl sm:text-5xl font-bold tracking-tight">
-            <span className="inline-block bg-gradient-to-r from-purple-300 to-pink-300 bg-clip-text text-transparent">
+          <h1 className="text-5xl font-bold tracking-tight mb-2">
+            <span className="bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
               📅 학급 일정
             </span>
           </h1>
-          <p className="text-gray-400 text-sm mt-2 font-light">학급의 중요한 일정을 관리하세요</p>
+          <p className="text-gray-600 text-sm font-light">학급의 중요한 일정을 관리하세요</p>
         </div>
 
         {/* Form */}
         <form onSubmit={addItem} className="liquid-glass p-8 mb-10 animate-fade-in-scale">
           <div className="space-y-6">
             <div>
-              <label className="block text-xs font-semibold text-gray-300 mb-3 uppercase tracking-wide">
+              <label className="block text-xs font-semibold text-gray-700 mb-3 uppercase tracking-wide">
                 행사명
               </label>
               <input
@@ -90,18 +90,18 @@ export default function Schedule() {
                 placeholder="행사 이름을 입력하세요"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl focus:ring-2 focus:ring-pink-400 font-light"
+                className="w-full px-4 py-3 rounded-xl focus:ring-2 focus:ring-pink-500 font-light text-gray-900"
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-gray-300 mb-3 uppercase tracking-wide">
+              <label className="block text-xs font-semibold text-gray-700 mb-3 uppercase tracking-wide">
                 날짜
               </label>
               <input
                 type="date"
                 value={date}
                 onChange={(e) => setDate(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl focus:ring-2 focus:ring-pink-400 font-light"
+                className="w-full px-4 py-3 rounded-xl focus:ring-2 focus:ring-pink-500 font-light text-gray-900"
               />
             </div>
             <button
@@ -117,25 +117,25 @@ export default function Schedule() {
         <div className="space-y-4">
           {items.length === 0 ? (
             <div className="liquid-glass rounded-3xl p-12 text-center animate-fade-in-scale">
-              <p className="text-gray-400 font-light">예정된 일정이 없습니다</p>
+              <p className="text-gray-500 font-light">예정된 일정이 없습니다</p>
             </div>
           ) : (
             items.map((item, index) => {
               const dday = calculateDday(item.date)
               let ddayText = ''
-              let ddayColor = 'text-red-400'
+              let ddayColor = 'text-red-600'
 
               if (dday > 0) {
                 ddayText = `D-${dday}`
-                if (dday <= 7) ddayColor = 'text-red-400'
-                else if (dday <= 30) ddayColor = 'text-orange-400'
-                else ddayColor = 'text-blue-400'
+                if (dday <= 7) ddayColor = 'text-red-600'
+                else if (dday <= 30) ddayColor = 'text-orange-600'
+                else ddayColor = 'text-blue-600'
               } else if (dday === 0) {
                 ddayText = '🔴 D-Day'
-                ddayColor = 'text-red-500'
+                ddayColor = 'text-red-600'
               } else {
                 ddayText = `D+${Math.abs(dday)}`
-                ddayColor = 'text-gray-400'
+                ddayColor = 'text-gray-600'
               }
 
               return (
@@ -145,8 +145,8 @@ export default function Schedule() {
                   style={{ animationDelay: `${index * 0.1}s` }}
                 >
                   <div className="flex-1">
-                    <h3 className="text-lg font-semibold text-white mb-1">{item.title}</h3>
-                    <p className="text-sm text-gray-400 font-light">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-1">{item.title}</h3>
+                    <p className="text-sm text-gray-600 font-light">
                       {new Date(item.date).toLocaleDateString('ko-KR', {
                         weekday: 'long',
                         year: 'numeric',
@@ -161,9 +161,9 @@ export default function Schedule() {
                     </span>
                     <button
                       onClick={() => deleteItem(item.id)}
-                      className="flex-shrink-0 w-8 h-8 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 hover:text-red-300 flex items-center justify-center transition-all duration-300"
+                      className="flex-shrink-0 w-8 h-8 rounded-lg bg-red-100 hover:bg-red-200 text-red-600 hover:text-red-700 flex items-center justify-center transition-all duration-300"
                     >
-                      ✕
+                      ×
                     </button>
                   </div>
                 </div>

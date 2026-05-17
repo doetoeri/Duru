@@ -1,7 +1,6 @@
 'use client'
 
 import Link from 'next/link'
-import { useState } from 'react'
 
 const DAYS = ['월', '화', '수', '목', '금']
 const PERIODS = ['1교시', '2교시', '3교시', '4교시', '5교시', '6교시', '7교시']
@@ -55,25 +54,23 @@ const DEFAULT_TIMETABLE: Record<string, Record<string, string>> = {
 }
 
 export default function Timetable() {
-  const [timetable] = useState(DEFAULT_TIMETABLE)
-
   return (
     <main className="relative min-h-screen pt-20 pb-20 px-4 sm:px-6 lg:px-8">
       <div className="max-w-6xl mx-auto">
         {/* Header */}
         <div className="mb-12 animate-fade-in-up">
-          <Link href="/" className="inline-flex items-center text-gray-400 hover:text-white transition-colors mb-6">
+          <Link href="/" className="inline-flex items-center text-gray-600 hover:text-gray-900 transition-colors mb-6">
             <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 12H5M12 19l-7-7 7-7" />
             </svg>
             <span className="text-sm font-light">돌아가기</span>
           </Link>
-          <h1 className="text-4xl sm:text-5xl font-bold tracking-tight">
-            <span className="inline-block bg-gradient-to-r from-orange-300 to-red-300 bg-clip-text text-transparent">
+          <h1 className="text-5xl font-bold tracking-tight mb-2">
+            <span className="bg-gradient-to-r from-orange-600 to-red-600 bg-clip-text text-transparent">
               ⏰ 시간표
             </span>
           </h1>
-          <p className="text-gray-400 text-sm mt-2 font-light">고촌고 1학년 8반</p>
+          <p className="text-gray-600 text-sm font-light">고촌고 1학년 8반</p>
         </div>
 
         {/* Timetable Grid */}
@@ -86,11 +83,11 @@ export default function Timetable() {
               }}
             >
               {/* Header Row */}
-              <div className="text-xs font-semibold text-gray-400 uppercase tracking-wide flex items-center"></div>
+              <div className="text-xs font-semibold text-gray-700 uppercase tracking-wide flex items-center"></div>
               {DAYS.map((day) => (
                 <div
                   key={day}
-                  className="text-center py-4 font-semibold text-gray-300 text-sm border-b border-white/10"
+                  className="text-center py-4 font-semibold text-gray-900 text-sm border-b border-gray-200"
                 >
                   {day}요일
                 </div>
@@ -99,16 +96,16 @@ export default function Timetable() {
               {/* Timetable Rows */}
               {PERIODS.map((period, idx) => (
                 <div key={period} className="contents">
-                  <div className="text-xs font-semibold text-gray-400 uppercase tracking-wide flex items-center justify-center py-4 border-b border-white/10">
+                  <div className="text-xs font-semibold text-gray-700 uppercase tracking-wide flex items-center justify-center py-4 border-b border-gray-200">
                     {period}
                   </div>
                   {DAYS.map((day) => (
                     <div
                       key={`${day}-${period}`}
-                      className="liquid-glass !bg-opacity-50 p-4 text-center flex flex-col items-center justify-center min-h-24"
+                      className="liquid-glass p-4 text-center flex flex-col items-center justify-center min-h-24"
                     >
-                      <div className="text-sm font-medium text-white mb-2">
-                        {timetable[day][period]}
+                      <div className="text-sm font-medium text-gray-900 mb-2">
+                        {DEFAULT_TIMETABLE[day][period]}
                       </div>
                       <div className="text-xs text-gray-500 font-light">메모 없음</div>
                     </div>

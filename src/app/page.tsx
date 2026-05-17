@@ -10,8 +10,8 @@ const features = [
     description: '공지사항을 한눈에',
     href: '/announcements',
     icon: '📢',
-    gradient: 'from-blue-500/20 to-cyan-500/20',
-    borderColor: 'rgba(34, 211, 238, 0.3)',
+    gradient: 'from-blue-100 to-cyan-100',
+    textColor: 'text-blue-600',
   },
   {
     id: 2,
@@ -19,8 +19,8 @@ const features = [
     description: 'D-Day까지 카운트',
     href: '/schedule',
     icon: '📅',
-    gradient: 'from-purple-500/20 to-pink-500/20',
-    borderColor: 'rgba(236, 72, 153, 0.3)',
+    gradient: 'from-purple-100 to-pink-100',
+    textColor: 'text-purple-600',
   },
   {
     id: 3,
@@ -28,8 +28,8 @@ const features = [
     description: '주간 수업 일정',
     href: '/timetable',
     icon: '⏰',
-    gradient: 'from-orange-500/20 to-red-500/20',
-    borderColor: 'rgba(248, 113, 113, 0.3)',
+    gradient: 'from-orange-100 to-red-100',
+    textColor: 'text-orange-600',
   },
   {
     id: 4,
@@ -37,8 +37,8 @@ const features = [
     description: '오늘의 메뉴',
     href: '/meals',
     icon: '🍽️',
-    gradient: 'from-green-500/20 to-emerald-500/20',
-    borderColor: 'rgba(52, 211, 153, 0.3)',
+    gradient: 'from-green-100 to-emerald-100',
+    textColor: 'text-green-600',
   },
   {
     id: 5,
@@ -46,8 +46,8 @@ const features = [
     description: '학습 자료 공유',
     href: '/resources',
     icon: '📚',
-    gradient: 'from-indigo-500/20 to-blue-500/20',
-    borderColor: 'rgba(99, 102, 241, 0.3)',
+    gradient: 'from-indigo-100 to-blue-100',
+    textColor: 'text-indigo-600',
   },
   {
     id: 6,
@@ -55,8 +55,8 @@ const features = [
     description: '기능 테스트',
     href: '/tester',
     icon: '🔧',
-    gradient: 'from-slate-500/20 to-gray-500/20',
-    borderColor: 'rgba(148, 163, 184, 0.3)',
+    gradient: 'from-slate-100 to-gray-100',
+    textColor: 'text-slate-600',
   },
 ]
 
@@ -74,14 +74,14 @@ export default function Home() {
       {/* Hero Section */}
       <div className="max-w-7xl mx-auto mb-20 animate-fade-in-up">
         <div className="text-center">
-          <h1 className="text-5xl sm:text-6xl lg:text-7xl font-bold tracking-tight mb-6">
-            <span className="inline-block bg-gradient-to-r from-blue-200 via-purple-200 to-pink-200 bg-clip-text text-transparent">
+          <h1 className="text-6xl sm:text-7xl lg:text-8xl font-bold tracking-tight mb-6">
+            <span className="bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">
               DURU
             </span>
           </h1>
-          <p className="text-lg sm:text-xl text-gray-300 max-w-2xl mx-auto leading-relaxed font-light">
+          <p className="text-lg sm:text-xl text-gray-600 max-w-2xl mx-auto leading-relaxed font-light">
             고촌고등학교 1학년 8반<br />
-            <span className="text-sm text-gray-400 mt-2 inline-block">통합 학급 관리 플랫폼</span>
+            <span className="text-base text-gray-500 mt-2 inline-block">통합 학급 관리 플랫폼</span>
           </p>
         </div>
       </div>
@@ -108,19 +108,19 @@ export default function Home() {
                     <div className="text-5xl mb-4 transform group-hover:scale-110 transition-transform duration-300">
                       {feature.icon}
                     </div>
-                    <h3 className="text-xl font-semibold tracking-tight mb-2">
+                    <h3 className="text-xl font-semibold tracking-tight mb-2 text-gray-900">
                       {feature.name}
                     </h3>
-                    <p className="text-sm text-gray-300 font-light">
+                    <p className="text-sm text-gray-600 font-light">
                       {feature.description}
                     </p>
                   </div>
 
                   {/* Arrow indicator */}
                   <div className="flex items-center justify-between mt-6">
-                    <span className="text-xs text-gray-400 font-light">탐색하기</span>
+                    <span className="text-xs text-gray-500 font-light">탐색하기</span>
                     <svg
-                      className="w-4 h-4 text-gray-400 transform group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform duration-300"
+                      className="w-4 h-4 text-gray-500 transform group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform duration-300"
                       fill="none"
                       stroke="currentColor"
                       viewBox="0 0 24 24"
@@ -142,7 +142,7 @@ export default function Home() {
 
       {/* Footer */}
       <div className="max-w-7xl mx-auto mt-20 text-center">
-        <p className="text-sm text-gray-400 font-light">
+        <p className="text-sm text-gray-500 font-light">
           DURU v0.1.0 · 2026
         </p>
       </div>
