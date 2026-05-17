@@ -14,14 +14,14 @@ export default function Announcements() {
   const [announcements, setAnnouncements] = useState<Announcement[]>([])
   const [title, setTitle] = useState('')
   const [content, setContent] = useState('')
+  const [mounted, setMounted] = useState(false)
 
-  // 로컬스토리지에서 로드
   useEffect(() => {
+    setMounted(true)
     const saved = localStorage.getItem('announcements')
     if (saved) setAnnouncements(JSON.parse(saved))
   }, [])
 
-  // 로컬스토리지에 저장
   const saveToStorage = (items: Announcement[]) => {
     localStorage.setItem('announcements', JSON.stringify(items))
   }
@@ -50,64 +50,89 @@ export default function Announcements() {
     saveToStorage(updated)
   }
 
+  if (!mounted) return null
+
   return (
-    <main className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-gray-900 p-4">
+    <main className="relative min-h-screen pt-20 pb-20 px-4 sm:px-6 lg:px-8">
       <div className="max-w-4xl mx-auto">
         {/* Header */}
-        <div className="flex items-center justify-between mb-8 pt-6">
-          <Link href="/">
-            <h1 className="text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400 cursor-pointer hover:from-pink-400 hover:to-cyan-400 transition-all">📢 학급 알림</h1>
+        <div className="mb-12 animate-fade-in-up">
+          <Link href="/" className="inline-flex items-center text-gray-400 hover:text-white transition-colors mb-6">
+            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 12H5M12 19l-7-7 7-7" />
+            </svg>
+            <span className="text-sm font-light">돌아가기</span>
           </Link>
+          <h1 className="text-4xl sm:text-5xl font-bold tracking-tight">
+            <span className="inline-block bg-gradient-to-r from-blue-300 to-cyan-300 bg-clip-text text-transparent">
+              📢 학급 알림
+            </span>
+          </h1>
+          <p className="text-gray-400 text-sm mt-2 font-light">공지사항을 게시하고 관리하세요</p>
         </div>
 
         {/* Form */}
-        <form onSubmit={addAnnouncement} className="glass rounded-2xl p-8 mb-8 border-2 border-purple-400">
-          <div className="mb-4">
-            <input
-              type="text"
-              placeholder="제목"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              className="w-full bg-gray-800 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-400"
-            />
+        <form onSubmit={addAnnouncement} className="liquid-glass p-8 mb-10 animate-fade-in-scale">
+          <div className="space-y-6">
+            <div>
+              <label className="block text-xs font-semibold text-gray-300 mb-3 uppercase tracking-wide">
+                제목
+              </label>
+              <input
+                type="text"
+                placeholder="공지사항의 제목을 입력하세요"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                className="w-full px-4 py-3 rounded-xl focus:ring-2 focus:ring-blue-400 font-light"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-300 mb-3 uppercase tracking-wide">
+                내용
+              </label>
+              <textarea
+                placeholder="공지사항의 내용을 입력하세요"
+                value={content}
+                onChange={(e) => setContent(e.target.value)}
+                rows={5}
+                className="w-full px-4 py-3 rounded-xl focus:ring-2 focus:ring-blue-400 font-light resize-none"
+              />
+            </div>
+            <button
+              type="submit"
+              className="w-full bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white font-medium py-3 rounded-xl transition-all duration-300 text-sm uppercase tracking-wide"
+            >
+              게시하기
+            </button>
           </div>
-          <div className="mb-4">
-            <textarea
-              placeholder="내용"
-              value={content}
-              onChange={(e) => setContent(e.target.value)}
-              rows={4}
-              className="w-full bg-gray-800 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-400 resize-none"
-            />
-          </div>
-          <button
-            type="submit"
-            className="w-full bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-bold py-3 rounded-lg transition-all"
-          >
-            게시하기
-          </button>
         </form>
 
         {/* Announcements List */}
         <div className="space-y-4">
           {announcements.length === 0 ? (
-            <div className="glass rounded-2xl p-8 text-center text-gray-400">
-              아직 게시글이 없습니다.
+            <div className="liquid-glass rounded-3xl p-12 text-center animate-fade-in-scale">
+              <p className="text-gray-400 font-light">아직 게시된 공지사항이 없습니다</p>
             </div>
           ) : (
-            announcements.map((ann) => (
-              <div key={ann.id} className="glass rounded-2xl p-6 border-l-4 border-pink-400 hover:scale-102 transition-transform">
-                <div className="flex justify-between items-start mb-2">
-                  <h3 className="text-xl font-bold text-purple-300">{ann.title}</h3>
+            announcements.map((ann, index) => (
+              <div
+                key={ann.id}
+                className="liquid-glass p-6 hover:scale-102 transition-all duration-300 animate-slide-in-right"
+                style={{ animationDelay: `${index * 0.1}s` }}
+              >
+                <div className="flex justify-between items-start gap-4">
+                  <div className="flex-1">
+                    <h3 className="text-lg font-semibold text-white mb-2">{ann.title}</h3>
+                    <p className="text-gray-300 text-sm leading-relaxed font-light mb-3">{ann.content}</p>
+                    <p className="text-xs text-gray-500 font-light">{ann.createdAt}</p>
+                  </div>
                   <button
                     onClick={() => deleteAnnouncement(ann.id)}
-                    className="text-red-400 hover:text-red-300 font-bold"
+                    className="flex-shrink-0 w-8 h-8 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 hover:text-red-300 flex items-center justify-center transition-all duration-300"
                   >
                     ✕
                   </button>
                 </div>
-                <p className="text-gray-300 mb-2">{ann.content}</p>
-                <p className="text-sm text-gray-500">{ann.createdAt}</p>
               </div>
             ))
           )}

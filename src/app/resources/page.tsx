@@ -14,8 +14,10 @@ export default function Resources() {
   const [resources, setResources] = useState<Resource[]>([])
   const [title, setTitle] = useState('')
   const [content, setContent] = useState('')
+  const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
+    setMounted(true)
     const saved = localStorage.getItem('resources')
     if (saved) setResources(JSON.parse(saved))
   }, [])
@@ -48,61 +50,87 @@ export default function Resources() {
     saveToStorage(updated)
   }
 
+  if (!mounted) return null
+
   return (
-    <main className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-gray-900 p-4">
+    <main className="relative min-h-screen pt-20 pb-20 px-4 sm:px-6 lg:px-8">
       <div className="max-w-4xl mx-auto">
-        <Link href="/">
-          <h1 className="text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-orange-400 to-red-400 cursor-pointer mb-8 pt-6">📁 자료 보관함</h1>
-        </Link>
+        {/* Header */}
+        <div className="mb-12 animate-fade-in-up">
+          <Link href="/" className="inline-flex items-center text-gray-400 hover:text-white transition-colors mb-6">
+            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 12H5M12 19l-7-7 7-7" />
+            </svg>
+            <span className="text-sm font-light">돌아가기</span>
+          </Link>
+          <h1 className="text-4xl sm:text-5xl font-bold tracking-tight">
+            <span className="inline-block bg-gradient-to-r from-indigo-300 to-blue-300 bg-clip-text text-transparent">
+              📚 자료 보관함
+            </span>
+          </h1>
+          <p className="text-gray-400 text-sm mt-2 font-light">학습 자료를 공유하세요</p>
+        </div>
 
         {/* Form */}
-        <form onSubmit={addResource} className="glass rounded-2xl p-8 mb-8 border-2 border-orange-400">
-          <div className="mb-4">
-            <input
-              type="text"
-              placeholder="자료 제목 (예: 1단원 학습지)"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              className="w-full bg-gray-800 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-400"
-            />
+        <form onSubmit={addResource} className="liquid-glass p-8 mb-10 animate-fade-in-scale">
+          <div className="space-y-6">
+            <div>
+              <label className="block text-xs font-semibold text-gray-300 mb-3 uppercase tracking-wide">
+                자료 제목
+              </label>
+              <input
+                type="text"
+                placeholder="자료의 제목을 입력하세요"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                className="w-full px-4 py-3 rounded-xl focus:ring-2 focus:ring-indigo-400 font-light"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-300 mb-3 uppercase tracking-wide">
+                설명
+              </label>
+              <textarea
+                placeholder="자료에 대한 설명을 입력하세요"
+                value={content}
+                onChange={(e) => setContent(e.target.value)}
+                rows={4}
+                className="w-full px-4 py-3 rounded-xl focus:ring-2 focus:ring-indigo-400 font-light resize-none"
+              />
+            </div>
+            <button
+              type="submit"
+              className="w-full bg-gradient-to-r from-indigo-500 to-blue-500 hover:from-indigo-600 hover:to-blue-600 text-white font-medium py-3 rounded-xl transition-all duration-300 text-sm uppercase tracking-wide"
+            >
+              자료 올리기
+            </button>
           </div>
-          <div className="mb-4">
-            <textarea
-              placeholder="설명 (예: 스캔본 링크 또는 설명)"
-              value={content}
-              onChange={(e) => setContent(e.target.value)}
-              rows={4}
-              className="w-full bg-gray-800 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-400 resize-none"
-            />
-          </div>
-          <button
-            type="submit"
-            className="w-full bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white font-bold py-3 rounded-lg transition-all"
-          >
-            자료 올리기
-          </button>
         </form>
 
         {/* Resources List */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {resources.length === 0 ? (
-            <div className="glass rounded-2xl p-8 text-center text-gray-400 md:col-span-2">
-              아직 올린 자료가 없습니다.
+            <div className="liquid-glass rounded-3xl p-12 text-center animate-fade-in-scale md:col-span-2">
+              <p className="text-gray-400 font-light">아직 올린 자료가 없습니다</p>
             </div>
           ) : (
-            resources.map((resource) => (
-              <div key={resource.id} className="glass rounded-2xl p-6 border-l-4 border-orange-400">
-                <div className="flex justify-between items-start mb-2">
-                  <h3 className="text-lg font-bold text-orange-300">{resource.title}</h3>
+            resources.map((resource, index) => (
+              <div
+                key={resource.id}
+                className="liquid-glass p-6 animate-slide-in-right"
+                style={{ animationDelay: `${index * 0.1}s` }}
+              >
+                <div className="flex justify-between items-start gap-3 mb-3">
+                  <h3 className="text-base font-semibold text-white flex-1">{resource.title}</h3>
                   <button
                     onClick={() => deleteResource(resource.id)}
-                    className="text-red-400 hover:text-red-300 font-bold"
+                    className="flex-shrink-0 w-8 h-8 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 hover:text-red-300 flex items-center justify-center transition-all duration-300 text-sm"
                   >
                     ✕
                   </button>
                 </div>
-                <p className="text-gray-300 text-sm mb-2">{resource.content}</p>
-                <p className="text-xs text-gray-500">{resource.uploadedAt}</p>
+                <p className="text-gray-300 text-sm leading-relaxed font-light mb-3">{resource.content}</p>
+                <p className="text-xs text-gray-500 font-light">{resource.uploadedAt}</p>
               </div>
             ))
           )}

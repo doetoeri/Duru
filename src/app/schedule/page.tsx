@@ -13,8 +13,10 @@ export default function Schedule() {
   const [items, setItems] = useState<ScheduleItem[]>([])
   const [title, setTitle] = useState('')
   const [date, setDate] = useState('')
+  const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
+    setMounted(true)
     const saved = localStorage.getItem('schedule')
     if (saved) setItems(JSON.parse(saved))
   }, [])
@@ -55,63 +57,111 @@ export default function Schedule() {
     return diff
   }
 
+  if (!mounted) return null
+
   return (
-    <main className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-gray-900 p-4">
+    <main className="relative min-h-screen pt-20 pb-20 px-4 sm:px-6 lg:px-8">
       <div className="max-w-4xl mx-auto">
-        <Link href="/">
-          <h1 className="text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-pink-400 to-cyan-400 cursor-pointer mb-8 pt-6">📅 학급 일정</h1>
-        </Link>
+        {/* Header */}
+        <div className="mb-12 animate-fade-in-up">
+          <Link href="/" className="inline-flex items-center text-gray-400 hover:text-white transition-colors mb-6">
+            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 12H5M12 19l-7-7 7-7" />
+            </svg>
+            <span className="text-sm font-light">돌아가기</span>
+          </Link>
+          <h1 className="text-4xl sm:text-5xl font-bold tracking-tight">
+            <span className="inline-block bg-gradient-to-r from-purple-300 to-pink-300 bg-clip-text text-transparent">
+              📅 학급 일정
+            </span>
+          </h1>
+          <p className="text-gray-400 text-sm mt-2 font-light">학급의 중요한 일정을 관리하세요</p>
+        </div>
 
         {/* Form */}
-        <form onSubmit={addItem} className="glass rounded-2xl p-8 mb-8 border-2 border-pink-400">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-            <input
-              type="text"
-              placeholder="행사명"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              className="bg-gray-800 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-pink-400"
-            />
-            <input
-              type="date"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-              className="bg-gray-800 rounded-lg px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-pink-400"
-            />
+        <form onSubmit={addItem} className="liquid-glass p-8 mb-10 animate-fade-in-scale">
+          <div className="space-y-6">
+            <div>
+              <label className="block text-xs font-semibold text-gray-300 mb-3 uppercase tracking-wide">
+                행사명
+              </label>
+              <input
+                type="text"
+                placeholder="행사 이름을 입력하세요"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                className="w-full px-4 py-3 rounded-xl focus:ring-2 focus:ring-pink-400 font-light"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-300 mb-3 uppercase tracking-wide">
+                날짜
+              </label>
+              <input
+                type="date"
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+                className="w-full px-4 py-3 rounded-xl focus:ring-2 focus:ring-pink-400 font-light"
+              />
+            </div>
             <button
               type="submit"
-              className="bg-gradient-to-r from-pink-500 to-cyan-500 hover:from-pink-600 hover:to-cyan-600 text-white font-bold rounded-lg transition-all"
+              className="w-full bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-medium py-3 rounded-xl transition-all duration-300 text-sm uppercase tracking-wide"
             >
-              추가
+              일정 추가
             </button>
           </div>
         </form>
 
-        {/* Timeline */}
+        {/* Schedule Timeline */}
         <div className="space-y-4">
           {items.length === 0 ? (
-            <div className="glass rounded-2xl p-8 text-center text-gray-400">
-              예정된 일정이 없습니다.
+            <div className="liquid-glass rounded-3xl p-12 text-center animate-fade-in-scale">
+              <p className="text-gray-400 font-light">예정된 일정이 없습니다</p>
             </div>
           ) : (
-            items.map((item) => {
+            items.map((item, index) => {
               const dday = calculateDday(item.date)
               let ddayText = ''
-              if (dday > 0) ddayText = `D-${dday}`
-              else if (dday === 0) ddayText = 'D-Day'
-              else ddayText = `D+${Math.abs(dday)}`
+              let ddayColor = 'text-red-400'
+
+              if (dday > 0) {
+                ddayText = `D-${dday}`
+                if (dday <= 7) ddayColor = 'text-red-400'
+                else if (dday <= 30) ddayColor = 'text-orange-400'
+                else ddayColor = 'text-blue-400'
+              } else if (dday === 0) {
+                ddayText = '🔴 D-Day'
+                ddayColor = 'text-red-500'
+              } else {
+                ddayText = `D+${Math.abs(dday)}`
+                ddayColor = 'text-gray-400'
+              }
 
               return (
-                <div key={item.id} className="glass rounded-2xl p-6 border-l-4 border-cyan-400 flex justify-between items-center">
-                  <div>
-                    <h3 className="text-xl font-bold text-cyan-300">{item.title}</h3>
-                    <p className="text-gray-400">{new Date(item.date).toLocaleDateString('ko-KR')}</p>
+                <div
+                  key={item.id}
+                  className="liquid-glass p-6 flex items-center justify-between gap-6 animate-slide-in-right"
+                  style={{ animationDelay: `${index * 0.1}s` }}
+                >
+                  <div className="flex-1">
+                    <h3 className="text-lg font-semibold text-white mb-1">{item.title}</h3>
+                    <p className="text-sm text-gray-400 font-light">
+                      {new Date(item.date).toLocaleDateString('ko-KR', {
+                        weekday: 'long',
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric',
+                      })}
+                    </p>
                   </div>
                   <div className="flex items-center gap-4">
-                    <span className="text-2xl font-bold text-pink-400">{ddayText}</span>
+                    <span className={`text-2xl font-bold font-mono ${ddayColor}`}>
+                      {ddayText}
+                    </span>
                     <button
                       onClick={() => deleteItem(item.id)}
-                      className="text-red-400 hover:text-red-300 font-bold text-lg"
+                      className="flex-shrink-0 w-8 h-8 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 hover:text-red-300 flex items-center justify-center transition-all duration-300"
                     >
                       ✕
                     </button>

@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import { useState } from 'react'
 
 const DAYS = ['월', '화', '수', '목', '금']
 const PERIODS = ['1교시', '2교시', '3교시', '4교시', '5교시', '6교시', '7교시']
@@ -54,33 +55,62 @@ const DEFAULT_TIMETABLE: Record<string, Record<string, string>> = {
 }
 
 export default function Timetable() {
+  const [timetable] = useState(DEFAULT_TIMETABLE)
+
   return (
-    <main className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-gray-900 p-4">
+    <main className="relative min-h-screen pt-20 pb-20 px-4 sm:px-6 lg:px-8">
       <div className="max-w-6xl mx-auto">
-        <Link href="/">
-          <h1 className="text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-400 cursor-pointer mb-8 pt-6">⏰ 시간표</h1>
-        </Link>
+        {/* Header */}
+        <div className="mb-12 animate-fade-in-up">
+          <Link href="/" className="inline-flex items-center text-gray-400 hover:text-white transition-colors mb-6">
+            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 12H5M12 19l-7-7 7-7" />
+            </svg>
+            <span className="text-sm font-light">돌아가기</span>
+          </Link>
+          <h1 className="text-4xl sm:text-5xl font-bold tracking-tight">
+            <span className="inline-block bg-gradient-to-r from-orange-300 to-red-300 bg-clip-text text-transparent">
+              ⏰ 시간표
+            </span>
+          </h1>
+          <p className="text-gray-400 text-sm mt-2 font-light">고촌고 1학년 8반</p>
+        </div>
 
         {/* Timetable Grid */}
-        <div className="overflow-x-auto">
-          <div className="inline-block min-w-full glass rounded-2xl p-6 border-2 border-cyan-400">
-            <div className="grid gap-2" style={{ gridTemplateColumns: `100px repeat(5, 1fr)` }}>
-              {/* Header */}
-              <div className="bg-cyan-500/20 p-3 rounded font-bold text-cyan-300">교시</div>
+        <div className="overflow-x-auto animate-fade-in-scale">
+          <div className="liquid-glass p-8 min-w-max">
+            <div
+              className="grid gap-3"
+              style={{
+                gridTemplateColumns: `120px repeat(5, 1fr)`,
+              }}
+            >
+              {/* Header Row */}
+              <div className="text-xs font-semibold text-gray-400 uppercase tracking-wide flex items-center"></div>
               {DAYS.map((day) => (
-                <div key={day} className="bg-cyan-500/20 p-3 rounded font-bold text-cyan-300 text-center">
-                  {day}
+                <div
+                  key={day}
+                  className="text-center py-4 font-semibold text-gray-300 text-sm border-b border-white/10"
+                >
+                  {day}요일
                 </div>
               ))}
 
               {/* Timetable Rows */}
-              {PERIODS.map((period) => (
+              {PERIODS.map((period, idx) => (
                 <div key={period} className="contents">
-                  <div className="bg-gray-800/50 p-3 rounded font-bold text-gray-300 text-center">{period}</div>
+                  <div className="text-xs font-semibold text-gray-400 uppercase tracking-wide flex items-center justify-center py-4 border-b border-white/10">
+                    {period}
+                  </div>
                   {DAYS.map((day) => (
-                    <div key={`${day}-${period}`} className="glass rounded-lg p-4 border-l-2 border-cyan-400 text-center">
-                      <div className="text-white font-semibold">{DEFAULT_TIMETABLE[day][period]}</div>
-                      <div className="text-xs text-gray-400 mt-1">메모 없음</div>
+                    <div
+                      key={`${day}-${period}`}
+                      className="liquid-glass !bg-opacity-50 p-4 text-center flex flex-col items-center justify-center min-h-24"
+                    >
+                      <div className="text-sm font-medium text-white mb-2">
+                        {timetable[day][period]}
+                      </div>
+                      <div className="text-xs text-gray-500 font-light">메모 없음</div>
                     </div>
                   ))}
                 </div>
