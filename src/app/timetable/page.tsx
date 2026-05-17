@@ -60,14 +60,13 @@ export default function Timetable() {
         {/* Header */}
         <div className="mb-12 animate-fade-in-up">
           <Link href="/" className="inline-flex items-center text-gray-600 hover:text-gray-900 transition-colors mb-6">
-            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 12H5M12 19l-7-7 7-7" />
-            </svg>
+            <span className="material-icons text-xl mr-2">arrow_back</span>
             <span className="text-sm font-light">돌아가기</span>
           </Link>
           <h1 className="text-5xl font-bold tracking-tight mb-2">
             <span className="bg-gradient-to-r from-orange-600 to-red-600 bg-clip-text text-transparent">
-              ⏰ 시간표
+              <span className="material-icons text-5xl align-text-bottom mr-2">schedule</span>
+              시간표
             </span>
           </h1>
           <p className="text-gray-600 text-sm font-light">고촌고 1학년 8반</p>

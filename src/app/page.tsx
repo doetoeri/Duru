@@ -9,7 +9,7 @@ const features = [
     name: '학급 알림',
     description: '공지사항을 한눈에',
     href: '/announcements',
-    icon: '📢',
+    icon: 'notifications_active',
     gradient: 'from-blue-100 to-cyan-100',
     textColor: 'text-blue-600',
   },
@@ -18,7 +18,7 @@ const features = [
     name: '학급 일정',
     description: 'D-Day까지 카운트',
     href: '/schedule',
-    icon: '📅',
+    icon: 'calendar_today',
     gradient: 'from-purple-100 to-pink-100',
     textColor: 'text-purple-600',
   },
@@ -27,7 +27,7 @@ const features = [
     name: '시간표',
     description: '주간 수업 일정',
     href: '/timetable',
-    icon: '⏰',
+    icon: 'schedule',
     gradient: 'from-orange-100 to-red-100',
     textColor: 'text-orange-600',
   },
@@ -36,7 +36,7 @@ const features = [
     name: '급식',
     description: '오늘의 메뉴',
     href: '/meals',
-    icon: '🍽️',
+    icon: 'restaurant',
     gradient: 'from-green-100 to-emerald-100',
     textColor: 'text-green-600',
   },
@@ -45,7 +45,7 @@ const features = [
     name: '자료 보관함',
     description: '학습 자료 공유',
     href: '/resources',
-    icon: '📚',
+    icon: 'folder_open',
     gradient: 'from-indigo-100 to-blue-100',
     textColor: 'text-indigo-600',
   },
@@ -54,7 +54,7 @@ const features = [
     name: 'Tester',
     description: '기능 테스트',
     href: '/tester',
-    icon: '🔧',
+    icon: 'build',
     gradient: 'from-slate-100 to-gray-100',
     textColor: 'text-slate-600',
   },
@@ -105,8 +105,10 @@ export default function Home() {
                 {/* Content */}
                 <div className="relative p-8 h-full flex flex-col justify-between z-10">
                   <div>
-                    <div className="text-5xl mb-4 transform group-hover:scale-110 transition-transform duration-300">
-                      {feature.icon}
+                    <div className="text-5xl mb-4 transform group-hover:scale-110 transition-transform duration-300 w-fit">
+                      <span className="material-icons text-5xl text-gray-800">
+                        {feature.icon}
+                      </span>
                     </div>
                     <h3 className="text-xl font-semibold tracking-tight mb-2 text-gray-900">
                       {feature.name}

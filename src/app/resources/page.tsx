@@ -58,14 +58,13 @@ export default function Resources() {
         {/* Header */}
         <div className="mb-12 animate-fade-in-up">
           <Link href="/" className="inline-flex items-center text-gray-600 hover:text-gray-900 transition-colors mb-6">
-            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 12H5M12 19l-7-7 7-7" />
-            </svg>
+            <span className="material-icons text-xl mr-2">arrow_back</span>
             <span className="text-sm font-light">돌아가기</span>
           </Link>
           <h1 className="text-5xl font-bold tracking-tight">
             <span className="bg-gradient-to-r from-indigo-600 to-blue-600 bg-clip-text text-transparent">
-              📚 자료 보관함
+              <span className="material-icons text-5xl align-text-bottom mr-2">folder_open</span>
+              자료 보관함
             </span>
           </h1>
           <p className="text-gray-600 text-sm mt-2 font-light">학습 자료를 공유하세요</p>
@@ -124,9 +123,9 @@ export default function Resources() {
                   <h3 className="text-base font-semibold text-gray-900 flex-1">{resource.title}</h3>
                   <button
                     onClick={() => deleteResource(resource.id)}
-                    className="flex-shrink-0 w-8 h-8 rounded-lg bg-red-100 hover:bg-red-200 text-red-600 hover:text-red-700 flex items-center justify-center transition-all duration-300 text-sm"
+                    className="flex-shrink-0 w-8 h-8 rounded-lg bg-red-100 hover:bg-red-200 text-red-600 hover:text-red-700 flex items-center justify-center transition-all duration-300"
                   >
-                    ×
+                    <span className="material-icons text-lg">close</span>
                   </button>
                 </div>
                 <p className="text-gray-700 text-sm leading-relaxed font-light mb-3">{resource.content}</p>
